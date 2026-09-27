@@ -19,8 +19,10 @@ Rules:
   do not raise it again; list it under "skipped_on_purpose" with the reason instead.
 - When a finding is grounded in memory (a convention, a past rejection, a past incident), say so
   in the "precedent" field, quoting the memory in one short sentence. Otherwise set it to null.
-- If a change matches a pattern that caused a past incident, that finding is "high" severity and
-  must name the incident.
+- Incidents are the highest-value memory you have. Match them on the SHAPE of the bug, not on
+  exact wording: "one database query per item inside a loop" and "one network call per item
+  inside a loop" are the same shape. If a change repeats the shape of a past incident, the
+  finding is "high" severity and its "precedent" must name that incident and what it cost.
 - Be concrete. Point to the file and line. Suggest the fix, not just the problem.
 - Prefer few, real findings over many nitpicks. Maximum 6 findings.
 - Only comment on lines that appear in the diff.

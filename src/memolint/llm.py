@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections import deque
 from typing import Any
 
 from openai import APIStatusError, OpenAI, RateLimitError
@@ -29,6 +30,49 @@ class _Exhausted(Exception):
     """This provider is rate limited beyond what is worth waiting for."""
 
 
+class _RateWindow:
+    """Client-side pacing so we stay under a provider's tokens-per-minute cap.
+
+    Being told to wait by a 429 costs more than waiting voluntarily: the request is
+    wasted and, in a chain, it can bounce the run onto a different model mid-demo.
+    """
+
+    def __init__(self, tokens_per_min: int, *, now_fn=time.time, sleep_fn=time.sleep):
+        self.limit = tokens_per_min
+        self.events: deque[tuple[float, int]] = deque()
+        # Injectable so tests can exercise the waiting logic without real delays.
+        self._now = now_fn
+        self._sleep = sleep_fn
+
+    def _spent(self, now: float) -> int:
+        while self.events and now - self.events[0][0] > 60.0:
+            self.events.popleft()
+        return sum(t for _, t in self.events)
+
+    def reserve(self, projected: int, *, announce=None) -> None:
+        """Wait, if needed, until this call fits inside the rolling one-minute budget."""
+        if self.limit <= 0:
+            return
+        # Bounded: each pass either drops the oldest event or gives up, so a sleep that
+        # does not advance the clock cannot spin here forever.
+        for _ in range(len(self.events) + 1):
+            now = self._now()
+            if not self.events or self._spent(now) + projected <= self.limit:
+                return
+            wait = 60.0 - (now - self.events[0][0]) + 0.5
+            if wait <= 0:
+                self.events.popleft()
+                continue
+            if announce:
+                announce(wait)
+            self._sleep(wait)
+            self.events.popleft()
+
+    def record(self, tokens: int) -> None:
+        if self.limit > 0:
+            self.events.append((self._now(), tokens))
+
+
 class LLM:
     """Calls the first working provider in a chain, failing over on rate limits.
 
@@ -43,6 +87,17 @@ class LLM:
         self.cfg = self.configs[0]
         self.last_usage: dict[str, int] = {}
         self._clients: dict[str, OpenAI] = {}
+        self._windows: dict[str, _RateWindow] = {
+            c.provider: _RateWindow(c.tokens_per_min) for c in self.configs
+        }
+
+    def pin_to_active(self) -> None:
+        """Drop the fallbacks and stay on whichever provider last answered.
+
+        Used when several calls must be comparable: switching models halfway through
+        an A/B comparison would make the two sides measure different things.
+        """
+        self.configs = [self.cfg]
 
     def _client(self, cfg: LLMConfig) -> OpenAI:
         if cfg.provider not in self._clients:
@@ -93,6 +148,12 @@ class LLM:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
+        window = self._windows.setdefault(cfg.provider, _RateWindow(cfg.tokens_per_min))
+        projected = approx_tokens(system) + approx_tokens(user) + max_tokens
+        window.reserve(
+            projected,
+            announce=lambda w: print(f"[llm] pacing for {cfg.provider} free tier, waiting {w:.0f}s"),
+        )
         last_err: Exception | None = None
         for attempt in range(1, attempts + 1):
             try:
@@ -114,6 +175,9 @@ class LLM:
                     "prompt_tokens": resp.usage.prompt_tokens or 0,
                     "completion_tokens": resp.usage.completion_tokens or 0,
                 }
+                window.record((resp.usage.prompt_tokens or 0) + (resp.usage.completion_tokens or 0))
+            else:
+                window.record(projected)
             try:
                 return _parse_json(text)
             except ValueError as e:

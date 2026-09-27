@@ -1,0 +1,181 @@
+Demo memory bank wiped.
+──────────────────────── PR #1: Add coupon validation ─────────────────────────
+Fresh bank. The reviewer knows nothing about this team yet.
+
+┌────────────────────────────── Memolint review ──────────────────────────────┐
+│ Add coupon validation to checkout  (orderflow#1)                            │
+│ memory on | 0 memories recalled | 1008 in / 687 out tokens | via groq       │
+└─────────────────────────────────────────────────────────────────────────────┘
+This PR adds coupon validation and application logic to the checkout flow, 
+including expiry, usage limits, and minimum order total checks. The 
+implementation has several issues including a race condition on usage counts, 
+silent failure on invalid coupons, and a bare except clause that could mask 
+real errors.
+
+F1  HIGH   Race condition on coupon usage count  
+orderflow/services/coupons.py:19
+     The usage count is checked before the order is committed, so two 
+concurrent requests can both see the count below max_uses and both apply the 
+coupon, exceeding the limit. Use a database-level constraint or a SELECT ... 
+FOR UPDATE on the coupon row to serialize access, or increment a counter 
+atomically and check the result.
+
+F2  MEDIUM Silent failure on invalid coupon  orderflow/services/coupons.py:14
+     When the coupon is not found, expired, over limit, or below min_total, the
+function just prints a message and returns the order unchanged. The caller has 
+no way to distinguish 'coupon applied' from 'coupon rejected' without 
+inspecting order.coupon_id. Raise a specific exception (e.g., 
+CouponNotFoundError, CouponExpiredError) so the API layer can return a 
+meaningful error to the user.
+
+F3  MEDIUM Bare except swallows all exceptions  
+orderflow/services/coupons.py:44
+     The bare except in remove_coupon will catch KeyboardInterrupt, SystemExit,
+and any programming error, then silently roll back and return the order as if 
+nothing happened. Catch a specific exception (e.g., SQLAlchemyError) and log 
+the error so failures are visible.
+
+F4  LOW    Use structured logging instead of print  
+orderflow/services/coupons.py:15
+     print() calls will not appear in production log aggregators and cannot be 
+filtered by level. Replace with a module-level logger 
+(logging.getLogger(__name__)) and use logger.info / logger.warning as 
+appropriate.
+
+F5  LOW    datetime.utcnow() is deprecated  orderflow/services/coupons.py:18
+     datetime.utcnow() is deprecated in Python 3.12+ and returns a naive 
+datetime. Use datetime.now(timezone.utc) instead to get a timezone-aware 
+datetime, which also avoids ambiguity if the database stores timezone-aware 
+timestamps.
+
+────────────────────────────── The team responds ──────────────────────────────
+A reviewer accepts some findings, rejects one, and states two conventions.
+
+accepted: F2, the logging finding
+rule stored: structured logger, never print
+ rule stored: no type hints on private helpers
+rule stored: guard clauses over nested if/else
+───────────────────── PR #2: Add order export for finance ─────────────────────
+Different file, same team. Watch what it flags, and what it now deliberately 
+skips.
+
+┌────────────────────────────── Memolint review ──────────────────────────────┐
+│ Add order export for finance  (orderflow#2)                                 │
+│ memory on | 15 memories recalled | 1925 in / 743 out tokens | via groq      │
+└─────────────────────────────────────────────────────────────────────────────┘
+This PR adds a nightly CSV export service for settled orders and a CLI entry 
+point. The implementation has a critical N+1 query pattern that matches a past 
+incident, uses print() for logging, and silently swallows exceptions, all of 
+which violate team conventions.
+
+F1  HIGH   N+1 query: one customer lookup per order inside loop  
+orderflow/services/export.py:25
+     The loop calls `_customer(order.customer_id)` for every order, issuing one
+database query per item. This is the exact shape of the past incident where 
+per-item queries inside a loop caused a production outage. Fix: fetch all 
+required customers in a single query using 
+`session.query(Customer).filter(Customer.id.in_()).all()` and build a dict 
+lookup, or join the query in `_settled_orders`.
+     precedent: Past incident: one database query per item inside a loop caused
+a production outage.
+
+F2  MEDIUM Use print() instead of structured logging  
+orderflow/services/export.py:21
+     Lines 21 and 34 use `print()` for logging. Team convention requires `log =
+get_logger(__name__)` from `orderflow.logging` with structured fields. Replace 
+with `log.info("export_started", day=day, count=len(orders))` and 
+`log.info("export_completed", rows=written)`.
+     precedent: Team convention: never use print() for logging; use 
+get_logger(__name__) from orderflow.logging to log structured fields.
+
+F3  MEDIUM Bare except swallows all exceptions silently  
+orderflow/services/export.py:42
+     The `except: pass` in `export_range` silently discards all errors, making 
+failures invisible. At minimum, log the exception with 
+`log.error("export_day_failed", day=day, exc_info=True)` and consider 
+re-raising or collecting errors so the caller knows the export was incomplete.
+     precedent: Past review of orderflow#1 flagged a bare except block as a 
+medium-priority issue.
+
+F4  LOW    Use print() instead of structured logging in CLI  
+orderflow/cli.py:15
+     Line 15 uses `print(f"wrote {n} rows")`. While CLI output is sometimes 
+acceptable, team convention prefers structured logging. Use 
+`log.info("export_cli_completed", rows=n)` to stay consistent.
+     precedent: Team convention: never use print() for logging; use 
+get_logger(__name__) from orderflow.logging.
+
+                  Deliberately not raised (learned from you)                   
+┌──────────────────────────────────────┬──────────────────────────────────────┐
+│ Would have said                      │ Why not                              │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Add type hints to private helper     │ Team convention: private helper      │
+│ functions _settled_orders and        │ functions (names starting with _) do │
+│ _customer                            │ not require type hints; only public  │
+│                                      │ functions need them.                 │
+└──────────────────────────────────────┴──────────────────────────────────────┘
+────────────────────────────── The team responds ──────────────────────────────
+The N+1 query finding gets accepted, and linked to a real outage.
+
+accepted: F1, the N+1 finding
+incident linked: Sept 3 checkout outage
+───────────────────── PR #3: Add refund summary endpoint ──────────────────────
+First without memory (a generic reviewer), then with memory (this team's 
+reviewer).
+
+───────────────────────────────── memory OFF ──────────────────────────────────
+┌────────────────────────────── Memolint review ──────────────────────────────┐
+│ Add refund summary endpoint  (orderflow#3)                                  │
+│ memory off | 902 in / 221 out tokens | via groq                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+This PR adds a new endpoint to retrieve a list of refunds for a specific order,
+including their current status from the payment provider. The implementation is
+functionally correct but contains a performance anti-pattern that should be 
+addressed before merging.
+
+F1  HIGH   N+1 network calls in loop  orderflow/api/refunds.py:27
+     The loop iterates over each refund and makes a separate network call to 
+the payment provider (`_provider_status`) for every single item. This will 
+cause significant latency and potential rate-limiting issues if an order has 
+many refunds. Consider batching the status requests if the provider supports 
+it, or at least adding a timeout and error handling to prevent the entire 
+endpoint from failing if one provider call hangs.
+
+────────────────────────────────── memory ON ──────────────────────────────────
+┌────────────────────────────── Memolint review ──────────────────────────────┐
+│ Add refund summary endpoint  (orderflow#3)                                  │
+│ memory on | 23 memories recalled | 2206 in / 313 out tokens | via groq      │
+└─────────────────────────────────────────────────────────────────────────────┘
+This PR adds a new endpoint to retrieve refund summaries for an order, 
+including live status from the payment provider. The implementation is 
+functionally correct but contains a critical performance anti-pattern that 
+directly repeats a past production incident.
+
+F1  HIGH   N+1 external API calls in loop  orderflow/api/refunds.py:27
+     The loop calls `_provider_status(refund)` for every refund, which triggers
+a network request to the payment provider per item. This is the exact shape of 
+the 2026-09-03 checkout outage where per-item calls exhausted the connection 
+pool. Batch these requests (e.g., `provider.get_refunds()`) or parallelize them
+with a bounded concurrency limit to prevent pool exhaustion.
+     precedent: Checkout outage occurred due to N+1 query pattern in orders 
+service, where one call per item inside a loop exhausted the Postgres 
+connection pool.
+
+                  Deliberately not raised (learned from you)                   
+┌──────────────────────────────────────┬──────────────────────────────────────┐
+│ Would have said                      │ Why not                              │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Add type hints to private helper     │ Team convention states that private  │
+│ functions `_refunds_for` and         │ helper functions (names starting     │
+│ `_provider_status`                   │ with _) do not require type hints;   │
+│                                      │ only public functions need them.     │
+└──────────────────────────────────────┴──────────────────────────────────────┘
+───────────────────────── What the reviewer now knows ─────────────────────────
+rule Prefer guard clauses and early returns over nested if/else blocks.
+rule Do not ask for type hints on private helper functions (names starting with
+_). Only public functions need them.
+rule Never use print() for logging. Use `log = get_logger(__name__)` from 
+orderflow.logging and log structured fields.
+
+Run memolint memories --repo demo/orderflow to see every memory, or memolint 
+ask 'what does this team care about?' --repo demo/orderflow.

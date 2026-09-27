@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Optional
@@ -20,6 +21,14 @@ from .llm import LLM, LLMError
 from .memory import Memory
 from .reviewer import Review, format_markdown, learn_from_comments, review_diff
 from .state import find_finding, load_review, save_review
+
+# The Windows console defaults to cp1252, which cannot encode the characters rich
+# emits. Without this, output dies mid-run with a UnicodeEncodeError.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    except Exception:
+        pass
 
 app = typer.Typer(help="A code reviewer that remembers your team's precedents.")
 console = Console()
@@ -96,8 +105,9 @@ def _print_review(review: Review) -> None:
         console.print("[dim]Diff was truncated to fit the token budget.[/]")
 
 
-def _run_review(bundle: DiffBundle, pr_ref: str, repo_slug: str, settings: Settings, use_memory: bool) -> Review:
-    llm = LLM(settings.llm_chain)
+def _run_review(bundle: DiffBundle, pr_ref: str, repo_slug: str, settings: Settings, use_memory: bool,
+                llm: LLM | None = None) -> Review:
+    llm = llm or LLM(settings.llm_chain)
     memory = _memory(settings, repo_slug) if use_memory else None
     try:
         review = review_diff(bundle, pr_ref, llm, memory)
@@ -225,7 +235,7 @@ def feedback(
     mem = _memory(settings, rev.get("repo") or _repo_slug(None))
     verdict = "accepted" if accept else "rejected"
     mem.record_feedback(f, verdict, note, rev["pr_ref"])
-    console.print(f"[green]Remembered:[/] {verdict} '{f['title']}'" + (f" — {note}" if note else ""))
+    console.print(f"[green]Remembered:[/] {verdict} '{f['title']}'" + (f" - {note}" if note else ""))
     if rule:
         mem.teach(rule)
         console.print(f"[green]Convention stored:[/] {rule}")
@@ -377,25 +387,27 @@ def demo(auto: bool = typer.Option(False, "--auto", help="Run without pausing.")
 
     step("The team responds", "A reviewer accepts some findings, rejects one, and states two conventions.")
     _pause(auto)
-    fid = _find_by_keywords(r1, "print")
+    fid = _find_by_keywords(r1, "print", "logging")
     if fid:
         mem.record_feedback(next(f for f in r1.findings if f.id == fid).__dict__, "accepted", "Yes, never print in services.", "orderflow#1")
+        console.print(f"[green]accepted:[/] {fid}, the logging finding")
     mem.teach("Never use print() for logging. Use `log = get_logger(__name__)` from orderflow.logging and log structured fields.")
-    console.print("[green]✓[/] accepted 'print' finding, rule stored: structured logger, never print")
+    console.print("[green]rule stored:[/] structured logger, never print")
 
     fid = _find_by_keywords(r1, "type hint", "annotation", "typing")
     if fid:
         mem.record_feedback(next(f for f in r1.findings if f.id == fid).__dict__, "rejected", "We do not add type hints to private helpers, only to public functions.", "orderflow#1")
-        console.print("[yellow]✗[/] rejected 'type hints' finding: private helpers do not get type hints here")
+        console.print("[yellow]rejected:[/] 'type hints' finding: private helpers do not get type hints here")
     else:
         mem.teach("Do not ask for type hints on private helper functions (names starting with _). Only public functions need them.")
-        console.print("[yellow]✗[/] rule stored: no type hints on private helpers")
+        console.print("[yellow][no][/] rule stored: no type hints on private helpers")
 
     fid = _find_by_keywords(r1, "nested", "guard", "early return", "indentation")
     if fid:
         mem.record_feedback(next(f for f in r1.findings if f.id == fid).__dict__, "accepted", "Guard clauses, always.", "orderflow#1")
+        console.print(f"[green]accepted:[/] {fid}, the nesting finding")
     mem.teach("Prefer guard clauses and early returns over nested if/else blocks.")
-    console.print("[green]✓[/] accepted 'nested ifs' finding, rule stored: guard clauses over nesting")
+    console.print("[green]rule stored:[/] guard clauses over nested if/else")
 
     # PR 2
     step("PR #2: Add order export for finance", "Different file, same team. Watch what it flags, and what it now deliberately skips.")
@@ -409,25 +421,35 @@ def demo(auto: bool = typer.Option(False, "--auto", help="Run without pausing.")
     fid = _find_by_keywords(r2, "n+1", "per order", "inside the loop", "in the loop", "each order", "query in a loop", "loop")
     if fid:
         mem.record_feedback(next(f for f in r2.findings if f.id == fid).__dict__, "accepted", "Good catch.", "orderflow#2")
+        console.print(f"[green]accepted:[/] {fid}, the N+1 finding")
     mem.record_incident(
-        "Per-row database calls inside a loop (N+1 queries) exhausted the Postgres connection pool during the "
-        "Sept 3 checkout outage (PR #212, orders service). 41 minutes of failed checkouts. Batch-load with a single query instead.",
+        "The Sept 3 checkout outage (PR #212, orders service) was caused by making one call per item "
+        "inside a loop: an N+1 query pattern that exhausted the Postgres connection pool and failed "
+        "checkouts for 41 minutes. Treat any per-item call inside a loop as the same risk, whether it "
+        "is a database query or an external API request, and batch or parallelise it instead.",
         "orderflow#2",
     )
-    console.print("[green]✓[/] accepted N+1 finding, incident linked: Sept 3 checkout outage")
+    console.print("[green]incident linked:[/] Sept 3 checkout outage")
 
     # PR 3, without and with memory
     step("PR #3: Add refund summary endpoint", "First without memory (a generic reviewer), then with memory (this team's reviewer).")
     _pause(auto)
     b3 = from_file(DEMO_DIR / "03-refund-summary.diff")
+    # One LLM for both halves, pinned after the first call: a mid-comparison switch to a
+    # different model would mean the two sides are not measuring the same thing.
+    ab_llm = LLM(settings.llm_chain)
     console.rule("[red]memory OFF")
-    r3a = _run_review(b3, "orderflow#3", DEMO_REPO, settings, use_memory=False)
+    r3a = _run_review(b3, "orderflow#3", DEMO_REPO, settings, use_memory=False, llm=ab_llm)
     _print_review(r3a)
+    ab_llm.pin_to_active()
     _pause(auto)
     console.rule("[green]memory ON")
     b3 = from_file(DEMO_DIR / "03-refund-summary.diff")
-    r3b = _run_review(b3, "orderflow#3", DEMO_REPO, settings, use_memory=True)
+    r3b = _run_review(b3, "orderflow#3", DEMO_REPO, settings, use_memory=True, llm=ab_llm)
     _print_review(r3b)
+    if r3a.provider != r3b.provider:
+        console.print(f"[yellow]note:[/] the two halves ran on different providers "
+                      f"({r3a.provider} vs {r3b.provider}), so this is not a like-for-like comparison.")
 
     console.rule("[bold blue]What the reviewer now knows")
     for r in mem.list_directives():

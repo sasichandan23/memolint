@@ -18,21 +18,25 @@ PROVIDERS: dict[str, dict[str, str]] = {
         "base_url": "https://api.groq.com/openai/v1",
         "key_env": "GROQ_API_KEY",
         "model": "qwen/qwen3.8-27b",
+        "tokens_per_min": "8000",   # free tier; we pace ourselves to stay under it
     },
     "gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "key_env": "GEMINI_API_KEY",
         "model": "gemini-3.8-flash",
+        "tokens_per_min": "250000",
     },
     "ollama": {
         "base_url": "http://localhost:11434/v1",
         "key_env": "OLLAMA_API_KEY",  # ignored by Ollama, any value works
         "model": "qwen2.5-coder:7b",
+        "tokens_per_min": "0",      # 0 means no pacing
     },
     "custom": {
         "base_url": "",  # taken from LLM_BASE_URL
         "key_env": "LLM_API_KEY",
         "model": "",
+        "tokens_per_min": "0",
     },
 }
 
@@ -54,6 +58,7 @@ class LLMConfig:
     base_url: str
     api_key: str
     model: str
+    tokens_per_min: int = 0   # 0 disables client-side pacing
 
 
 @dataclass
@@ -97,7 +102,9 @@ def _config_for(provider: str, *, is_primary: bool) -> LLMConfig | None:
         if not base_url:
             raise ConfigError("LLM_BASE_URL is required when LLM_PROVIDER=custom")
         raise ConfigError("LLM_MODEL is required when LLM_PROVIDER=custom")
-    return LLMConfig(provider=provider, base_url=base_url, api_key=api_key, model=model)
+    tpm_env = os.getenv(f"MEMOLINT_{provider.upper()}_TOKENS_PER_MIN")
+    tpm = int(tpm_env) if tpm_env else int(preset.get("tokens_per_min", "0"))
+    return LLMConfig(provider=provider, base_url=base_url, api_key=api_key, model=model, tokens_per_min=tpm)
 
 
 def _llm_chain() -> tuple[LLMConfig, list[LLMConfig]]:

@@ -112,14 +112,20 @@ Before each review, `recall` runs with a query built from the PR title, touched 
 
 Groq's free tier allows about 8K tokens per minute. A review is one model call:
 
-| part | budget |
-|---|---|
-| system prompt | ~450 tokens |
-| recalled memories | ≤1,000 tokens |
-| diff (changed hunks only, lockfiles skipped) | ≤2,500 tokens |
-| response | ≤1,400 tokens |
+Measured across the demo, per review:
 
-Roughly 5K tokens per review, so one review a minute and ~40 a day on one free key. Rate limits trigger a wait, not a crash.
+| | tokens in | tokens out |
+|---|---|---|
+| cold bank, no memories | 1,008 | 687 |
+| 15 memories recalled | 1,925 | 743 |
+| 23 memories recalled | 2,206 | 313 |
+
+So a review costs roughly 1-3K tokens, which fits Groq's free 8K per minute. Memolint
+paces itself against that budget rather than waiting to be told: it tracks a rolling
+one-minute window and delays a call that would cross the line. If a provider is capped
+for the day, the run moves to the next configured provider instead of dying.
+
+A full run of `memolint demo` is checked in at [docs/sample-demo-output.txt](docs/sample-demo-output.txt).
 
 ## Layout
 
