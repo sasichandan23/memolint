@@ -170,7 +170,7 @@ def learn_from_comments(findings: list[dict[str, Any]], comments: list[str], llm
 
 def format_markdown(review: Review) -> str:
     """Markdown body for a GitHub review."""
-    lines = [f"### Precedent review", "", review.summary or "", ""]
+    lines = [f"### Memolint review", "", review.summary or "", ""]
     if review.findings:
         for f in review.findings:
             where = f"`{f.file}`" + (f" line {f.line}" if f.line else "")

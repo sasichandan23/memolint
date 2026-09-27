@@ -1,4 +1,4 @@
-"""Precedent CLI. `precedent --help` for the full list."""
+"""Memolint CLI. `memolint --help` for the full list."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from .memory import Memory
 from .reviewer import Review, format_markdown, learn_from_comments, review_diff
 from .state import find_finding, load_review, save_review
 
-app = typer.Typer(help="A code reviewer that remembers your team's precedents.", no_args_is_help=True)
+app = typer.Typer(help="A code reviewer that remembers your team's precedents.")
 console = Console()
 
 SEV_COLOR = {"high": "red", "medium": "yellow", "low": "cyan"}
@@ -41,8 +41,8 @@ def _repo_slug(explicit: Optional[str]) -> str:
     if explicit:
         return explicit
     import os
-    if os.getenv("PRECEDENT_REPO"):
-        return os.environ["PRECEDENT_REPO"]
+    if os.getenv("MEMOLINT_REPO"):
+        return os.environ["MEMOLINT_REPO"]
     try:
         url = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=True).stdout.strip()
         tail = url.rstrip("/").removesuffix(".git")
@@ -69,7 +69,7 @@ def _print_review(review: Review) -> None:
     )
     usage = review.usage
     tok = f" · {usage.get('prompt_tokens', '?')} in / {usage.get('completion_tokens', '?')} out tokens" if usage else ""
-    console.print(Panel(f"{head}\n{mem}{tok}", title="Precedent review", border_style="blue"))
+    console.print(Panel(f"{head}\n{mem}{tok}", title="Memolint review", border_style="blue"))
     if review.summary:
         console.print(review.summary, style="italic")
         console.print()
@@ -109,10 +109,16 @@ def _run_review(bundle: DiffBundle, pr_ref: str, repo_slug: str, settings: Setti
 
 # ---------- commands ----------
 
-@app.callback()
-def _main(version: bool = typer.Option(False, "--version", help="Show version and exit.")):
+@app.callback(invoke_without_command=True)
+def _main(
+    ctx: typer.Context,
+    version: bool = typer.Option(False, "--version", help="Show version and exit."),
+):
     if version:
-        console.print(f"precedent {__version__}")
+        console.print(f"memolint {__version__}")
+        raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
         raise typer.Exit()
 
 
@@ -308,7 +314,7 @@ def ask(question: str = typer.Argument(...), repo: Optional[str] = typer.Option(
     settings = _settings(require_llm=False)
     with console.status("Reflecting..."):
         answer = _memory(settings, _repo_slug(repo)).reflect(question)
-    console.print(Panel(answer, title="Precedent", border_style="magenta"))
+    console.print(Panel(answer, title="Memolint", border_style="magenta"))
 
 
 @app.command()
@@ -424,8 +430,8 @@ def demo(auto: bool = typer.Option(False, "--auto", help="Run without pausing.")
     console.rule("[bold blue]What the reviewer now knows")
     for r in mem.list_directives():
         console.print(f"[magenta]rule[/] {r}")
-    console.print("\nRun [bold]precedent memories --repo demo/orderflow[/] to see every memory, "
-                  "or [bold]precedent ask 'what does this team care about?' --repo demo/orderflow[/].")
+    console.print("\nRun [bold]memolint memories --repo demo/orderflow[/] to see every memory, "
+                  "or [bold]memolint ask 'what does this team care about?' --repo demo/orderflow[/].")
 
 
 if __name__ == "__main__":

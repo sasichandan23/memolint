@@ -88,7 +88,7 @@ class Memory:
         try:
             self.client.create_bank(
                 bank_id=self.bank_id,
-                name=f"Precedent: {self.repo_slug}",
+                name=f"Memolint: {self.repo_slug}",
                 mission=BANK_MISSION.format(repo=self.repo_slug),
             )
         except Exception as e:  # already exists, or server rejects re-create

@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-import precedent.state as state
-from precedent.diff import from_file
-from precedent.reviewer import format_markdown, review_diff
+import memolint.state as state
+from memolint.diff import from_file
+from memolint.reviewer import format_markdown, review_diff
 
 DEMO = Path(__file__).resolve().parents[1] / "demo" / "prs"
 
@@ -32,7 +32,7 @@ class StubLLM:
 
 
 def test_review_without_memory_and_state_roundtrip(tmp_path, monkeypatch):
-    monkeypatch.setattr(state, "STATE_DIR", tmp_path / ".precedent")
+    monkeypatch.setattr(state, "STATE_DIR", tmp_path / ".memolint")
     bundle = from_file(DEMO / "01-coupon-validation.diff")
     llm = StubLLM()
     review = review_diff(bundle, "orderflow#1", llm, memory=None)

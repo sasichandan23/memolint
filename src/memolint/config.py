@@ -37,11 +37,11 @@ PROVIDERS: dict[str, dict[str, str]] = {
 }
 
 # Token budgets sized for Groq's free tier (8K tokens/min on the listed models).
-MAX_DIFF_CHARS = int(os.getenv("PRECEDENT_MAX_DIFF_CHARS", "10000"))      # ~2.5K tokens
-MAX_MEMORY_TOKENS = int(os.getenv("PRECEDENT_MAX_MEMORY_TOKENS", "1000"))
-MAX_OUTPUT_TOKENS = int(os.getenv("PRECEDENT_MAX_OUTPUT_TOKENS", "1400"))
+MAX_DIFF_CHARS = int(os.getenv("MEMOLINT_MAX_DIFF_CHARS", "10000"))      # ~2.5K tokens
+MAX_MEMORY_TOKENS = int(os.getenv("MEMOLINT_MAX_MEMORY_TOKENS", "1000"))
+MAX_OUTPUT_TOKENS = int(os.getenv("MEMOLINT_MAX_OUTPUT_TOKENS", "1400"))
 
-STATE_DIR = Path(os.getenv("PRECEDENT_STATE_DIR", ".precedent"))
+STATE_DIR = Path(os.getenv("MEMOLINT_STATE_DIR", ".memolint"))
 
 
 class ConfigError(RuntimeError):
@@ -93,12 +93,12 @@ def load_settings(require_llm: bool = True) -> Settings:
         hindsight_api_key=os.getenv("HINDSIGHT_API_KEY") or None,
         llm=llm,
         github_token=os.getenv("GITHUB_TOKEN") or None,
-        bot_login=os.getenv("PRECEDENT_BOT_LOGIN") or None,
+        bot_login=os.getenv("MEMOLINT_BOT_LOGIN") or None,
     )
 
 
 def bank_id_for(repo_slug: str) -> str:
     """One Hindsight memory bank per repository. Slug like 'owner/repo' or a local name."""
-    prefix = os.getenv("PRECEDENT_BANK_PREFIX", "precedent")
+    prefix = os.getenv("MEMOLINT_BANK_PREFIX", "memolint")
     clean = re.sub(r"[^a-zA-Z0-9_-]+", "-", repo_slug).strip("-").lower()
     return f"{prefix}-{clean}"[:64]

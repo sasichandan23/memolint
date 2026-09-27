@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from precedent.diff import from_file, new_line_numbers, parse_unified_diff
-from precedent.llm import _parse_json
-from precedent.memory import MemoryItem, RecallBundle
-from precedent.reviewer import build_recall_query
+from memolint.diff import from_file, new_line_numbers, parse_unified_diff
+from memolint.llm import _parse_json
+from memolint.memory import MemoryItem, RecallBundle
+from memolint.reviewer import build_recall_query
 
 DEMO = Path(__file__).resolve().parents[1] / "demo" / "prs"
 
