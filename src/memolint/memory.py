@@ -16,6 +16,7 @@ grouped by the tags above. That is the whole trick: the LLM is stateless, the ba
 
 from __future__ import annotations
 
+import atexit
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -80,6 +81,15 @@ class Memory:
         self.client = Hindsight(base_url=settings.hindsight_base_url, api_key=settings.hindsight_api_key)
         self.bank_id = bank_id
         self.repo_slug = repo_slug
+        # The client holds an aiohttp session; without this, Python prints
+        # "Unclosed client session" over our output at interpreter shutdown.
+        atexit.register(self.close)
+
+    def close(self) -> None:
+        try:
+            self.client.close()
+        except Exception:
+            pass
 
     # ---------- bank lifecycle ----------
 

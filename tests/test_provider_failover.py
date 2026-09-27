@@ -4,7 +4,7 @@ import httpx2 as httpx
 import pytest
 from openai import RateLimitError
 
-from memolint.config import load_settings
+from memolint.config import PROVIDERS, load_settings
 from memolint.llm import LLM, LLMConfig, LLMError
 
 BASE_ENV = {
@@ -25,7 +25,7 @@ def test_chain_puts_primary_first_and_keeps_other_configured_providers(monkeypat
     _env(monkeypatch)
     s = load_settings()
     assert [c.provider for c in s.llm_chain] == ["groq", "gemini"]
-    assert s.llm.model == "llama-3.3-70b-versatile"
+    assert s.llm.model == PROVIDERS["groq"]["model"]
 
 
 def test_primary_can_be_gemini(monkeypatch):
@@ -45,7 +45,7 @@ def test_model_override_applies_to_primary_only(monkeypatch):
     _env(monkeypatch, LLM_MODEL="custom-model")
     s = load_settings()
     assert s.llm.model == "custom-model"
-    assert s.llm_fallbacks[0].model == "gemini-2.5-flash"
+    assert s.llm_fallbacks[0].model == PROVIDERS["gemini"]["model"]
 
 
 def _rate_limit(retry_after: str | None):

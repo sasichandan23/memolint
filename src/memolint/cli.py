@@ -63,14 +63,14 @@ def _memory(settings: Settings, repo_slug: str) -> Memory:
 def _print_review(review: Review) -> None:
     head = f"[bold]{review.title}[/]  [dim]({review.pr_ref})[/]"
     mem = (
-        f"[green]memory on[/] · {review.memories_used} memories recalled"
+        f"[green]memory on[/] | {review.memories_used} memories recalled"
         if review.memory_enabled
         else "[red]memory off[/]"
     )
     usage = review.usage
-    tok = f" · {usage.get('prompt_tokens', '?')} in / {usage.get('completion_tokens', '?')} out tokens" if usage else ""
+    tok = f" | {usage.get('prompt_tokens', '?')} in / {usage.get('completion_tokens', '?')} out tokens" if usage else ""
     if review.provider:
-        tok += f" · via {review.provider}"
+        tok += f" | via {review.provider}"
     console.print(Panel(f"{head}\n{mem}{tok}", title="Memolint review", border_style="blue"))
     if review.summary:
         console.print(review.summary, style="italic")

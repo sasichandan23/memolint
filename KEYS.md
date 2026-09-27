@@ -22,12 +22,14 @@ This is what makes the project what it is. Every team convention, every accepted
 1. Sign up for an account.
 2. Go to **Billing** and enter promo code `MEMHACK99` for $50 in free credits.
 3. Create an API key.
-4. Copy the base URL shown in the dashboard.
 
 ```
-HINDSIGHT_BASE_URL=https://...        # from the dashboard
-HINDSIGHT_API_KEY=...                 # the key you created
+HINDSIGHT_BASE_URL=https://api.hindsight.vectorize.io
+HINDSIGHT_API_KEY=hsk_...             # the key you created
 ```
+
+The base URL above is the Hindsight Cloud API endpoint, verified working. The dashboard
+address (`ui.hindsight.vectorize.io`) is the web interface, not the API.
 
 **Used in:** `src/memolint/memory.py` — `retain`, `recall`, `reflect`, `create_directive`, `list_memories`.
 
@@ -98,7 +100,7 @@ GITHUB_TOKEN=github_pat_...
 
 | Variable | Why you might set it |
 |---|---|
-| `LLM_MODEL` | Override the model for the primary provider. Defaults to `llama-3.3-70b-versatile` on Groq, `gemini-2.5-flash` on Gemini. |
+| `LLM_MODEL` | Override the model for the primary provider. Defaults to `qwen/qwen3.8-27b` on Groq, `gemini-3.8-flash` on Gemini. |
 | `OLLAMA_API_KEY` | Set to any value to allow failing over to a local Ollama server. Off by default so the chain never ends in a dead localhost call. |
 | `MEMOLINT_MAX_DIFF_CHARS` | Shrink the diff budget if you keep hitting rate limits. |
 
