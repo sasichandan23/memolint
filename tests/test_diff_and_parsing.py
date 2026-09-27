@@ -33,7 +33,7 @@ def test_prompt_text_respects_budget():
 def test_new_line_numbers_for_inline_comments():
     b = from_file(DEMO / "03-refund-summary.diff")
     valid = new_line_numbers(b.files[0].patch)
-    assert 1 in valid and 41 in valid and 42 not in valid
+    assert 1 in valid and 39 in valid and 40 not in valid
 
 
 def test_json_parser_handles_fences_and_noise():
