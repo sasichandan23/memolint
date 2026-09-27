@@ -20,11 +20,34 @@ class LLMError(RuntimeError):
     pass
 
 
+# A 429 carrying a retry-after longer than this means a daily cap, not a per-minute
+# burst. Waiting it out would stall a demo, so we move to the next provider instead.
+SWITCH_IF_WAIT_EXCEEDS = 90.0
+
+
+class _Exhausted(Exception):
+    """This provider is rate limited beyond what is worth waiting for."""
+
+
 class LLM:
-    def __init__(self, cfg: LLMConfig):
-        self.cfg = cfg
-        self.client = OpenAI(base_url=cfg.base_url, api_key=cfg.api_key, max_retries=3)
+    """Calls the first working provider in a chain, failing over on rate limits.
+
+    A team with only a Groq key gets a single-provider chain and identical behaviour.
+    A team that also set a Gemini key keeps working after Groq's daily cap is hit.
+    """
+
+    def __init__(self, configs: LLMConfig | list[LLMConfig]):
+        self.configs = [configs] if isinstance(configs, LLMConfig) else list(configs)
+        if not self.configs:
+            raise LLMError("No LLM provider configured.")
+        self.cfg = self.configs[0]
         self.last_usage: dict[str, int] = {}
+        self._clients: dict[str, OpenAI] = {}
+
+    def _client(self, cfg: LLMConfig) -> OpenAI:
+        if cfg.provider not in self._clients:
+            self._clients[cfg.provider] = OpenAI(base_url=cfg.base_url, api_key=cfg.api_key, max_retries=3)
+        return self._clients[cfg.provider]
 
     def complete_json(
         self,
@@ -35,7 +58,37 @@ class LLM:
         temperature: float = 0.2,
         attempts: int = 4,
     ) -> dict[str, Any]:
-        """Ask for a JSON object and parse it. Retries on rate limits and on malformed JSON."""
+        """Ask for a JSON object and parse it, failing over between providers if needed."""
+        last_err: Exception | None = None
+        for idx, cfg in enumerate(self.configs):
+            try:
+                result = self._complete_with(cfg, system, user, max_tokens=max_tokens,
+                                             temperature=temperature, attempts=attempts)
+                self.cfg = cfg  # remember which provider actually answered
+                return result
+            except _Exhausted as e:
+                last_err = e
+                remaining = self.configs[idx + 1 :]
+                if remaining:
+                    print(f"[llm] {cfg.provider} is rate limited; switching to {remaining[0].provider}")
+                    continue
+                raise LLMError(
+                    f"{cfg.provider} is rate limited and no fallback provider is configured. "
+                    f"Add GEMINI_API_KEY to .env, or wait for the limit to reset."
+                ) from e
+            except LLMError as e:
+                last_err = e
+                remaining = self.configs[idx + 1 :]
+                if remaining:
+                    print(f"[llm] {cfg.provider} failed ({e}); switching to {remaining[0].provider}")
+                    continue
+                raise
+        raise LLMError(f"Every configured provider failed: {last_err}")
+
+    def _complete_with(
+        self, cfg: LLMConfig, system: str, user: str, *,
+        max_tokens: int, temperature: float, attempts: int,
+    ) -> dict[str, Any]:
         messages: list[dict[str, str]] = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -43,15 +96,17 @@ class LLM:
         last_err: Exception | None = None
         for attempt in range(1, attempts + 1):
             try:
-                resp = self._call(messages, max_tokens=max_tokens, temperature=temperature)
+                resp = self._call(cfg, messages, max_tokens=max_tokens, temperature=temperature)
             except RateLimitError as e:
-                wait = _retry_after(e) or min(60, 5 * attempt)
-                print(f"[llm] rate limited by {self.cfg.provider}, waiting {wait:.0f}s (attempt {attempt}/{attempts})")
+                wait = _retry_after(e) or min(60.0, 5.0 * attempt)
+                if wait > SWITCH_IF_WAIT_EXCEEDS:
+                    raise _Exhausted(f"{cfg.provider} asked us to wait {wait:.0f}s") from e
+                print(f"[llm] rate limited by {cfg.provider}, waiting {wait:.0f}s (attempt {attempt}/{attempts})")
                 time.sleep(wait)
                 last_err = e
                 continue
             except APIStatusError as e:
-                raise LLMError(f"{self.cfg.provider} returned {e.status_code}: {e.message}") from e
+                raise LLMError(f"{cfg.provider} returned {e.status_code}: {e.message}") from e
 
             text = resp.choices[0].message.content or ""
             if resp.usage:
@@ -68,22 +123,25 @@ class LLM:
                     {"role": "assistant", "content": text},
                     {"role": "user", "content": "That was not valid JSON. Return only the JSON object."},
                 ]
-        raise LLMError(f"LLM did not return usable JSON after {attempts} attempts: {last_err}")
+        if isinstance(last_err, RateLimitError):
+            raise _Exhausted(f"{cfg.provider} stayed rate limited for {attempts} attempts")
+        raise LLMError(f"{cfg.provider} did not return usable JSON after {attempts} attempts: {last_err}")
 
-    def _call(self, messages: list[dict[str, str]], *, max_tokens: int, temperature: float):
+    def _call(self, cfg: LLMConfig, messages: list[dict[str, str]], *, max_tokens: int, temperature: float):
         kwargs: dict[str, Any] = dict(
-            model=self.cfg.model,
+            model=cfg.model,
             messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
         )
         # JSON mode is supported by Groq, Gemini's OpenAI endpoint and recent Ollama.
         # Some hosts reject it; fall back silently and rely on prompt + parser.
+        client = self._client(cfg)
         try:
-            return self.client.chat.completions.create(response_format={"type": "json_object"}, **kwargs)
+            return client.chat.completions.create(response_format={"type": "json_object"}, **kwargs)
         except APIStatusError as e:
             if e.status_code == 400 and "response_format" in (e.message or ""):
-                return self.client.chat.completions.create(**kwargs)
+                return client.chat.completions.create(**kwargs)
             raise
 
 

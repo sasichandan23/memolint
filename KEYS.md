@@ -1,12 +1,19 @@
 # API keys needed to run Memolint
 
-Everything below is free. No credit card is required for any of it.
+Four keys, all free, none require a credit card. Get all four: the two "optional" ones cost two minutes each and both make the project better.
 
-Two keys are required, one is optional. Copy `.env.example` to `.env` and paste the values in. **Never commit `.env`** — it is already in `.gitignore`.
+Copy `.env.example` to `.env` and paste the values in. **Never commit `.env`** — it is already in `.gitignore`.
+
+| # | Service | What it does | Needed? |
+|---|---|---|---|
+| 1 | Hindsight | Stores and recalls everything the reviewer learns | Required |
+| 2 | Groq | Writes the reviews | Required |
+| 3 | Google AI Studio | Takes over automatically when Groq hits its daily cap | Strongly recommended |
+| 4 | GitHub | Review real pull requests and learn from replies | Recommended |
 
 ---
 
-## 1. Hindsight — the memory layer (required)
+## 1. Hindsight — the memory layer
 
 This is what makes the project what it is. Every team convention, every accepted or rejected review suggestion, and every past incident is stored here and recalled before each review.
 
@@ -28,7 +35,7 @@ HINDSIGHT_API_KEY=...                 # the key you created
 
 ---
 
-## 2. Groq — the model that writes the reviews (required)
+## 2. Groq — the model that writes the reviews
 
 Reads the diff plus the recalled memories and produces the findings.
 
@@ -42,15 +49,36 @@ GROQ_API_KEY=gsk_...
 LLM_PROVIDER=groq
 ```
 
-**Used in:** `src/memolint/llm.py` via the OpenAI-compatible client, called from `src/memolint/reviewer.py`.
+**Used in:** `src/memolint/llm.py`, called from `src/memolint/reviewer.py`.
 
-**Free tier limits:** about 8,000 tokens per minute and 200,000 per day. One review costs roughly 5,000 tokens, so expect about one review per minute and around 40 per day on a single key. Hitting the limit causes a wait and retry, not a crash.
+**Free tier limits:** about 8,000 tokens per minute and 200,000 per day. One review costs roughly 5,000 tokens, so expect about one review per minute and around 40 per day on a single key.
 
 ---
 
-## 3. GitHub token — review real pull requests (optional)
+## 3. Google AI Studio — the automatic backup model
 
-Without this, Memolint still reviews diff files and local git branches, which is enough for the demo. With it, Memolint can read a real pull request, post its review as comments, and learn from replies.
+Not a manual switch. If Groq returns a rate limit that would take more than 90 seconds to clear, Memolint moves to Gemini mid-run and keeps going. A short burst limit is waited out on Groq instead. The review output prints which provider answered.
+
+This matters most during a live demo, where hitting a daily cap with no fallback means a dead terminal in front of an audience.
+
+**Get it:** https://aistudio.google.com/apikey
+
+1. Sign in with a Google account.
+2. Click **Create API key** and copy it.
+
+```
+GEMINI_API_KEY=...
+```
+
+Nothing else to configure. Leave `LLM_PROVIDER=groq`; the fallback is automatic. To make Gemini the primary instead, set `LLM_PROVIDER=gemini` and Groq becomes the backup.
+
+**Used in:** `src/memolint/config.py` builds the provider chain, `src/memolint/llm.py` walks it.
+
+---
+
+## 4. GitHub token — review real pull requests
+
+Without this, Memolint still reviews diff files and local git branches, which is enough for the demo. With it, Memolint can read a real pull request, post its review as inline comments, and learn from the replies people leave.
 
 **Get it:** https://github.com/settings/tokens
 
@@ -70,11 +98,11 @@ GITHUB_TOKEN=github_pat_...
 
 | Variable | Why you might set it |
 |---|---|
-| `GEMINI_API_KEY` | A second free model provider, in case Groq's daily limit runs out. Get it at https://aistudio.google.com/apikey and set `LLM_PROVIDER=gemini`. |
-| `LLM_MODEL` | Override the model. Defaults to `llama-3.3-70b-versatile` on Groq, `gemini-2.5-flash` on Gemini. |
+| `LLM_MODEL` | Override the model for the primary provider. Defaults to `llama-3.3-70b-versatile` on Groq, `gemini-2.5-flash` on Gemini. |
+| `OLLAMA_API_KEY` | Set to any value to allow failing over to a local Ollama server. Off by default so the chain never ends in a dead localhost call. |
 | `MEMOLINT_MAX_DIFF_CHARS` | Shrink the diff budget if you keep hitting rate limits. |
 
-Running a local model instead needs no key at all: install Ollama, then set `LLM_PROVIDER=ollama`.
+Running entirely on a local model needs no key at all: install Ollama, then set `LLM_PROVIDER=ollama`.
 
 ---
 
@@ -90,4 +118,4 @@ Creates the memory bank. If the Hindsight values are wrong, this is where it fai
 memolint demo
 ```
 
-Runs the full three-pull-request walkthrough. This exercises both keys end to end.
+Runs the full three-pull-request walkthrough. This exercises Hindsight and the model chain end to end.

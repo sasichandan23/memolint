@@ -69,6 +69,8 @@ def _print_review(review: Review) -> None:
     )
     usage = review.usage
     tok = f" · {usage.get('prompt_tokens', '?')} in / {usage.get('completion_tokens', '?')} out tokens" if usage else ""
+    if review.provider:
+        tok += f" · via {review.provider}"
     console.print(Panel(f"{head}\n{mem}{tok}", title="Memolint review", border_style="blue"))
     if review.summary:
         console.print(review.summary, style="italic")
@@ -95,7 +97,7 @@ def _print_review(review: Review) -> None:
 
 
 def _run_review(bundle: DiffBundle, pr_ref: str, repo_slug: str, settings: Settings, use_memory: bool) -> Review:
-    llm = LLM(settings.llm)
+    llm = LLM(settings.llm_chain)
     memory = _memory(settings, repo_slug) if use_memory else None
     try:
         review = review_diff(bundle, pr_ref, llm, memory)
@@ -269,7 +271,7 @@ def learn(pr: str = typer.Argument(..., help="GitHub PR: owner/repo#12 or URL.")
     if not human:
         console.print("No human comments to learn from yet.")
         raise typer.Exit(0)
-    items = learn_from_comments(rev["findings"], human, LLM(settings.llm))
+    items = learn_from_comments(rev["findings"], human, LLM(settings.llm_chain))
     mem = _memory(settings, repo or ref.slug)
     by_id = {f["id"]: f for f in rev["findings"]}
     for it in items:

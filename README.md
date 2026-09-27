@@ -29,14 +29,20 @@ pip install -e .
 cp .env.example .env
 ```
 
-Fill in `.env`. You need two keys, both free:
+Fill in `.env`. Four keys, all free, none need a card:
 
-| Key | Where | Notes |
+| Key | Where | What it does |
 |---|---|---|
-| `GROQ_API_KEY` | https://console.groq.com/keys | No card. Free tier is ~8K tokens/min, which a review fits in. |
-| `HINDSIGHT_BASE_URL` + `HINDSIGHT_API_KEY` | https://ui.hindsight.vectorize.io | Free starter credits. Base URL is in the dashboard. |
+| `HINDSIGHT_BASE_URL` + `HINDSIGHT_API_KEY` | https://ui.hindsight.vectorize.io | The memory. Free starter credits; base URL is in the dashboard. |
+| `GROQ_API_KEY` | https://console.groq.com/keys | Writes the reviews. ~8K tokens/min free, and a review fits in one call. |
+| `GEMINI_API_KEY` | https://aistudio.google.com/apikey | Automatic backup when Groq's daily cap is hit. No extra config. |
+| `GITHUB_TOKEN` | https://github.com/settings/tokens | Review real PRs and learn from replies. Contents: read, Pull requests: read+write. |
 
-Optional: `GEMINI_API_KEY` (set `LLM_PROVIDER=gemini`), `GITHUB_TOKEN` to review and comment on real PRs. Full step-by-step instructions for every key are in [KEYS.md](KEYS.md).
+Only the first two are strictly required. Step-by-step instructions for each are in [KEYS.md](KEYS.md).
+
+Memolint tries providers in order and fails over on its own. A rate limit that clears in
+seconds is waited out; one that would take minutes moves the run to the next provider
+mid-review. Every review prints which provider answered, so a demo never dies on a 429.
 
 ### Fully self-hosted, zero cost forever
 

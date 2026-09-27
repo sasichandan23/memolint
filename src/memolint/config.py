@@ -62,36 +62,68 @@ class Settings:
     hindsight_api_key: str | None
     llm: LLMConfig
     github_token: str | None
+    llm_fallbacks: list[LLMConfig] = field(default_factory=list)
     bot_login: str | None = None
     extra: dict = field(default_factory=dict)
 
+    @property
+    def llm_chain(self) -> list[LLMConfig]:
+        """Primary provider first, then any other configured provider to fail over to."""
+        return [self.llm] + self.llm_fallbacks
 
-def _llm_config() -> LLMConfig:
-    provider = os.getenv("LLM_PROVIDER", "groq").strip().lower()
+
+def _config_for(provider: str, *, is_primary: bool) -> LLMConfig | None:
+    """Build a provider config from env. Returns None when the key is missing.
+
+    Only the primary provider raises on a missing key; fallbacks are skipped silently
+    so a team with one key works exactly as well as a team with three.
+    """
     if provider not in PROVIDERS:
         raise ConfigError(f"LLM_PROVIDER must be one of {', '.join(PROVIDERS)}; got {provider!r}")
     preset = PROVIDERS[provider]
-    base_url = os.getenv("LLM_BASE_URL") or preset["base_url"]
-    api_key = os.getenv(preset["key_env"]) or ("ollama" if provider == "ollama" else "")
-    model = os.getenv("LLM_MODEL") or preset["model"]
-    if not base_url:
-        raise ConfigError("LLM_BASE_URL is required when LLM_PROVIDER=custom")
-    if not api_key:
-        raise ConfigError(f"{preset['key_env']} is not set (needed for LLM_PROVIDER={provider})")
-    if not model:
+    # LLM_BASE_URL / LLM_MODEL are overrides for the primary provider only.
+    base_url = (os.getenv("LLM_BASE_URL") if is_primary else None) or preset["base_url"]
+    # Ollama ignores the key, so the primary provider needs no real value. As a *fallback*
+    # it must be opted into explicitly (set OLLAMA_API_KEY to anything), otherwise every
+    # chain would end in a dead localhost call.
+    api_key = os.getenv(preset["key_env"]) or ("ollama" if provider == "ollama" and is_primary else "")
+    model = (os.getenv("LLM_MODEL") if is_primary else None) or preset["model"]
+
+    if not api_key or not base_url or not model:
+        if not is_primary:
+            return None
+        if not api_key:
+            raise ConfigError(f"{preset['key_env']} is not set (needed for LLM_PROVIDER={provider})")
+        if not base_url:
+            raise ConfigError("LLM_BASE_URL is required when LLM_PROVIDER=custom")
         raise ConfigError("LLM_MODEL is required when LLM_PROVIDER=custom")
     return LLMConfig(provider=provider, base_url=base_url, api_key=api_key, model=model)
+
+
+def _llm_chain() -> tuple[LLMConfig, list[LLMConfig]]:
+    primary_name = os.getenv("LLM_PROVIDER", "groq").strip().lower()
+    primary = _config_for(primary_name, is_primary=True)
+    assert primary is not None  # _config_for raises rather than returning None for the primary
+
+    # Fail over in this order. Ollama is last: it only works if something is listening locally.
+    order = [p for p in ("groq", "gemini", "ollama") if p != primary_name]
+    fallbacks = [c for c in (_config_for(p, is_primary=False) for p in order) if c is not None]
+    return primary, fallbacks
 
 
 def load_settings(require_llm: bool = True) -> Settings:
     base_url = os.getenv("HINDSIGHT_BASE_URL", "").strip()
     if not base_url:
         raise ConfigError("HINDSIGHT_BASE_URL is not set. See .env.example.")
-    llm = _llm_config() if require_llm else LLMConfig("none", "", "", "")
+    if require_llm:
+        primary, fallbacks = _llm_chain()
+    else:
+        primary, fallbacks = LLMConfig("none", "", "", ""), []
     return Settings(
         hindsight_base_url=base_url.rstrip("/"),
         hindsight_api_key=os.getenv("HINDSIGHT_API_KEY") or None,
-        llm=llm,
+        llm=primary,
+        llm_fallbacks=fallbacks,
         github_token=os.getenv("GITHUB_TOKEN") or None,
         bot_login=os.getenv("MEMOLINT_BOT_LOGIN") or None,
     )

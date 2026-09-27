@@ -59,6 +59,7 @@ class Review:
     skipped_on_purpose: list[dict[str, str]] = field(default_factory=list)
     memories_used: int = 0
     memory_enabled: bool = True
+    provider: str = ""
     usage: dict[str, int] = field(default_factory=dict)
     diff_truncated: bool = False
 
@@ -136,6 +137,7 @@ def review_diff(
         skipped_on_purpose=[s for s in (data.get("skipped_on_purpose") or []) if isinstance(s, dict)],
         memories_used=recalled.count(),
         memory_enabled=memory is not None,
+        provider=getattr(getattr(llm, "cfg", None), "provider", ""),
         usage=dict(llm.last_usage),
         diff_truncated=bundle.truncated,
     )
