@@ -1,0 +1,62 @@
+# Add coupon validation to checkout
+# Validates coupon codes before applying a discount. Adds a helper to look up
+# the coupon and check expiry / usage limits.
+diff --git a/orderflow/services/coupons.py b/orderflow/services/coupons.py
+new file mode 100644
+index 0000000..3f1c2a9
+--- /dev/null
++++ b/orderflow/services/coupons.py
+@@ -0,0 +1,53 @@
++from datetime import datetime
++
++from orderflow.db import session
++from orderflow.models import Coupon, Order
++
++
++def _lookup(code):
++    return session.query(Coupon).filter(Coupon.code == code).first()
++
++
++def _usage_count(coupon):
++    return session.query(Order).filter(Order.coupon_id == coupon.id).count()
++
++
++def apply_coupon(order: Order, code: str) -> Order:
++    print("applying coupon", code, "to order", order.id)
++    coupon = _lookup(code)
++    if coupon is not None:
++        if coupon.expires_at is None or coupon.expires_at > datetime.utcnow():
++            if coupon.max_uses is None or _usage_count(coupon) < coupon.max_uses:
++                if coupon.min_total is None or order.total >= coupon.min_total:
++                    if coupon.percent_off:
++                        order.discount = round(order.total * coupon.percent_off / 100, 2)
++                    else:
++                        order.discount = min(coupon.amount_off, order.total)
++                    order.coupon_id = coupon.id
++                    print("discount", order.discount)
++                else:
++                    print("order total too low for coupon")
++            else:
++                print("coupon usage limit reached")
++        else:
++            print("coupon expired")
++    else:
++        print("coupon not found")
++    return order
++
++
++def remove_coupon(order: Order) -> Order:
++    try:
++        order.discount = 0
++        order.coupon_id = None
++        session.commit()
++    except:
++        session.rollback()
++    return order
++
++
++def coupon_summary(order):
++    if order.coupon_id:
++        c = session.query(Coupon).get(order.coupon_id)
++        return f"{c.code}: -{order.discount}"
++    return "no coupon"

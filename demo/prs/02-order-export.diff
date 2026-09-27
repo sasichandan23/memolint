@@ -1,0 +1,79 @@
+# Add order export for finance
+# Finance wants a nightly CSV of settled orders with customer name and region.
+# Adds an export service and a CLI entry point.
+diff --git a/orderflow/services/export.py b/orderflow/services/export.py
+new file mode 100644
+index 0000000..91be44d
+--- /dev/null
++++ b/orderflow/services/export.py
+@@ -0,0 +1,48 @@
++import csv
++from datetime import date
++
++from orderflow.db import session
++from orderflow.models import Customer, Order
++
++
++def _settled_orders(day):
++    return (
++        session.query(Order)
++        .filter(Order.status == "settled", Order.settled_on == day)
++        .all()
++    )
++
++
++def _customer(customer_id):
++    return session.query(Customer).filter(Customer.id == customer_id).first()
++
++
++def export_settled_orders(day: date, path: str) -> int:
++    orders = _settled_orders(day)
++    print(f"exporting {len(orders)} orders for {day}")
++    written = 0
++    with open(path, "w", newline="") as fh:
++        w = csv.writer(fh)
++        w.writerow(["order_id", "customer", "region", "total", "discount"])
++        for order in orders:
++            customer = _customer(order.customer_id)
++            w.writerow([
++                order.id,
++                customer.name if customer else "",
++                customer.region if customer else "",
++                order.total,
++                order.discount,
++            ])
++            written += 1
++    print("done", written)
++    return written
++
++
++def export_range(start: date, end: date, out_dir: str) -> None:
++    day = start
++    while day <= end:
++        try:
++            export_settled_orders(day, f"{out_dir}/orders-{day.isoformat()}.csv")
++        except:
++            pass
++        day = date.fromordinal(day.toordinal() + 1)
+diff --git a/orderflow/cli.py b/orderflow/cli.py
+index 7a1e0c2..b83d9f1 100644
+--- a/orderflow/cli.py
++++ b/orderflow/cli.py
+@@ -1,9 +1,16 @@
+ import sys
++from datetime import date
+
+ from orderflow.services.checkout import run_checkout
++from orderflow.services.export import export_settled_orders
+
+
+ def main(argv=None):
+     argv = argv or sys.argv[1:]
+     if argv and argv[0] == "checkout":
+         return run_checkout(argv[1:])
++    if argv and argv[0] == "export":
++        day = date.fromisoformat(argv[1]) if len(argv) > 1 else date.today()
++        n = export_settled_orders(day, f"exports/orders-{day.isoformat()}.csv")
++        print(f"wrote {n} rows")
++        return 0
+     return 1

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "precedent"
+version = "0.1.0"
+description = "A code reviewer that remembers your team's precedents. Built on Hindsight agent memory."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "hindsight-client>=0.10",
+  "openai>=1.50",
+  "python-dotenv>=1.0",
+  "rich>=13",
+  "typer>=0.12",
+  "requests>=2.31",
+]
+
+[project.scripts]
+precedent = "precedent.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]

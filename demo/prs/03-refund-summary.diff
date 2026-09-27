@@ -1,0 +1,48 @@
+# Add refund summary endpoint
+# Support needs GET /orders/<id>/refunds to show every refund on an order with
+# the payment provider's current status for each one.
+diff --git a/orderflow/api/refunds.py b/orderflow/api/refunds.py
+new file mode 100644
+index 0000000..c4d7e10
+--- /dev/null
++++ b/orderflow/api/refunds.py
+@@ -0,0 +1,39 @@
++from flask import Blueprint, jsonify
++
++from orderflow.db import session
++from orderflow.logging import get_logger
++from orderflow.models import Order, Refund
++from orderflow.payments import provider
++
++log = get_logger(__name__)
++bp = Blueprint("refunds", __name__)
++
++
++def _refunds_for(order_id):
++    return session.query(Refund).filter(Refund.order_id == order_id).all()
++
++
++def _provider_status(refund):
++    return provider.get_refund(refund.provider_ref)
++
++
++@bp.get("/orders/<int:order_id>/refunds")
++def refund_summary(order_id: int):
++    order = session.query(Order).get(order_id)
++    if order is None:
++        return jsonify({"error": "order not found"}), 404
++
++    refunds = _refunds_for(order_id)
++    items = []
++    for refund in refunds:
++        status = _provider_status(refund)
++        items.append({
++            "id": refund.id,
++            "amount": refund.amount,
++            "reason": refund.reason,
++            "provider_status": status.get("status"),
++            "settled_at": status.get("settled_at"),
++        })
++
++    log.info("refund_summary", order_id=order_id, count=len(items))
++    return jsonify({"order_id": order_id, "refunds": items})
