@@ -36,7 +36,7 @@ Fill in `.env`. You need two keys, both free:
 | `GROQ_API_KEY` | https://console.groq.com/keys | No card. Free tier is ~8K tokens/min, which a review fits in. |
 | `HINDSIGHT_BASE_URL` + `HINDSIGHT_API_KEY` | https://ui.hindsight.vectorize.io | Free starter credits. Base URL is in the dashboard. |
 
-Optional: `GEMINI_API_KEY` (set `LLM_PROVIDER=gemini`), `GITHUB_TOKEN` to review and comment on real PRs.
+Optional: `GEMINI_API_KEY` (set `LLM_PROVIDER=gemini`), `GITHUB_TOKEN` to review and comment on real PRs. Full step-by-step instructions for every key are in [KEYS.md](KEYS.md).
 
 ### Fully self-hosted, zero cost forever
 
