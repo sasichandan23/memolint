@@ -2,13 +2,13 @@
 
 The thing that finally made our automated reviewer useful wasn't a better model. It was storing the suggestions we turned down.
 
-Every AI code reviewer I've used has the same defect. It reads a diff, produces a competent list of observations, and forgets the whole exchange. Next week it reads a different diff from the same repository and tells you the same thing you already declined, in the same confident tone. The model isn't wrong exactly. It just has no way to know that this team decided, two months ago and for good reasons, that private helpers don't get type hints.
+Every AI code reviewer I've used has the same defect. It reads a diff, produces a competent list of observations, and forgets the exchange. Next week it reads another diff from the same repository and tells you the thing you already declined, in the same confident tone. The model isn't wrong exactly. It has no way to know this team decided, months ago and for good reasons, that private helpers don't get type hints.
 
 I built Memolint to fix precisely that, and the interesting part turned out to be the taxonomy of what to remember rather than the reviewing itself.
 
 ## What the system actually is
 
-Memolint is a command-line reviewer. It takes a diff, a git range, or a pull request, and it produces findings. That part is unremarkable and any competent prompt does it.
+Memolint is a command-line reviewer. It takes a diff, a git range, or a pull request, and produces findings. That part is unremarkable; any competent prompt does it.
 
 The part that matters sits either side of the model call. Before reviewing, it queries a memory bank for what the team has said that bears on this change. Afterwards, once a human responds, it writes back what happened. The memory layer is [Hindsight, Vectorize's open source memory system for AI agents](https://github.com/vectorize-io/hindsight), which gives me three primitives: `retain` to store, `recall` to retrieve against a query, and `reflect` to reason over the whole bank.
 
