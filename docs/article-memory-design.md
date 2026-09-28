@@ -1,6 +1,6 @@
 # Hindsight made my code reviewer stop repeating rejected advice
 
-The thing that finally made our automated reviewer useful wasn't a better model. It was storing the suggestions we turned down.
+What finally made our automated reviewer useful wasn't a better model. It was storing the suggestions we turned down.
 
 Every AI code reviewer I've used has the same defect. It reads a diff, produces a competent list of observations, and forgets the exchange. Next week it reads another diff from the same repository and tells you the thing you already declined, in the same confident tone. The model isn't wrong exactly. It has no way to know this team decided, months ago and for good reasons, that private helpers don't get type hints.
 
@@ -111,7 +111,7 @@ That table is the feature I did not plan and now consider essential. Silence is 
 
 ## What I'd tell someone building this
 
-**Classify memories on the way in.** Retrieval quality is decided at write time. Once everything is undifferentiated text, no amount of clever querying separates "a human told us this" from "we said this ourselves last Tuesday".
+**Classify memories on the way in.** Retrieval quality is decided at write time. Once everything is undifferentiated text, no clever querying separates "a human told us this" from "we said this last Tuesday".
 
 **Store the negative cases.** Most memory systems get pointed at successes. Rejections carry more information per byte than anything else my agent stores, because they encode a judgment you cannot recover from the codebase.
 
