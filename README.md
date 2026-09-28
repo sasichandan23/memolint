@@ -77,6 +77,9 @@ memolint incident "Unbounded IN() list in reports query locked the orders table"
 memolint learn owner/repo#42     # read human replies on GitHub and learn from them
 memolint memories                # what it knows about this repo
 memolint ask "what does this team care about in reviews?"
+
+memolint replay docs/demo-transcript.ansi --speed 1.4   # paced playback, for screen recording
+memolint replay docs/demo-transcript.ansi --marks       # section cue points
 ```
 
 Each repository gets its own memory bank, derived from the git remote or `--repo`.
@@ -125,7 +128,8 @@ paces itself against that budget rather than waiting to be told: it tracks a rol
 one-minute window and delays a call that would cross the line. If a provider is capped
 for the day, the run moves to the next configured provider instead of dying.
 
-A full run of `memolint demo` is checked in at [docs/sample-demo-output.txt](docs/sample-demo-output.txt).
+A full run of `memolint demo` is checked in at [docs/sample-demo-output.txt](docs/sample-demo-output.txt),
+and [docs/VIDEO.md](docs/VIDEO.md) has the recording plan.
 
 ## Layout
 

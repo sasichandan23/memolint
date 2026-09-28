@@ -1,0 +1,193 @@
+[2mDemo memory bank wiped.[0m
+[92m───────────────────────── [0m[1;34mPR #[0m[1;34m1[0m[1;34m: Add coupon validation[0m[92m ─────────────────────────[0m
+Fresh bank. The reviewer knows nothing about this team yet.
+
+[34m╭─[0m[34m─────────────────────────────[0m[34m Memolint review [0m[34m──────────────────────────────[0m[34m─╮[0m
+[34m│[0m [1mAdd coupon validation to checkout[0m  [2m(orderflow#1)[0m                             [34m│[0m
+[34m│[0m [32mmemory on[0m | 0 memories recalled | 1008 in / 830 out tokens | via groq        [34m│[0m
+[34m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+[3mThis PR adds coupon validation and application logic to the checkout flow, [0m
+[3mincluding expiry, usage limits, and minimum order total checks. The [0m
+[3mimplementation has several issues including race conditions, lack of error [0m
+[3mhandling, and potential data integrity problems that need to be addressed before[0m
+[3mmerging.[0m
+
+[1;31mF1  HIGH  [0m [1mRace condition in coupon usage count[0m  
+[2morderflow/services/coupons.py:[0m[1;2;36m19[0m
+     The _usage_count check on line [1;36m19[0m is not atomic with the subsequent 
+order.coupon_id assignment on line [1;36m24[0m. Multiple concurrent requests could all 
+pass the usage limit check and exceed max_uses. Use a database-level constraint 
+or SELECT [33m...[0m FOR UPDATE to make this atomic, or implement optimistic locking 
+with a version column on the Coupon model.
+
+[1;33mF2  MEDIUM[0m [1mMissing error handling for coupon application[0m  
+[2morderflow/services/coupons.py:[0m[1;2;36m15[0m
+     The apply_coupon function doesn't handle database errors or validation 
+failures. If the session.query fails or the order is in an invalid state, the 
+function will crash. Add try/except blocks with appropriate logging and return 
+meaningful error states or raise specific exceptions that the caller can handle.
+
+[1;33mF3  MEDIUM[0m [1mUsing [0m[1;35mdatetime.utcnow[0m[1m([0m[1m)[0m[1m is deprecated[0m  
+[2morderflow/services/coupons.py:[0m[1;2;36m17[0m
+     [1;35mdatetime.utcnow[0m[1m([0m[1m)[0m is deprecated in Python [1;36m3.12[0m+ and can cause timezone 
+confusion. Use [1;35mdatetime.now[0m[1m([0mtimezone.utc[1m)[0m instead to get a timezone-aware 
+datetime object. This ensures consistent behavior across different system 
+timezones and avoids subtle bugs when comparing with timezone-aware database 
+timestamps.
+
+[1;33mF4  MEDIUM[0m [1mBare except clause in remove_coupon[0m  [2morderflow/services/coupons.py:[0m[1;2;36m38[0m
+     The bare except on line [1;36m38[0m catches all exceptions including 
+KeyboardInterrupt and SystemExit, which can mask serious errors. Catch specific 
+exceptions like SQLAlchemyError or IntegrityError, and log the exception with 
+context before rolling back. This makes debugging much easier and prevents 
+accidentally swallowing critical errors.
+
+[1;33mF5  MEDIUM[0m [1mMissing session commit in apply_coupon[0m  
+[2morderflow/services/coupons.py:[0m[1;2;36m24[0m
+     The apply_coupon function modifies order.discount and order.coupon_id but 
+never calls [1;35msession.commit[0m[1m([0m[1m)[0m. This means the changes will only be persisted if 
+the caller commits, which is error-prone. Either commit within this function 
+[1m([0mwith proper error handling[1m)[0m or document clearly that the caller must commit, 
+and consider returning a success/failure indicator.
+
+[1;36mF6  LOW   [0m [1mPotential [0m[1;3;35mNone[0m[1m reference in coupon_summary[0m  
+[2morderflow/services/coupons.py:[0m[1;2;36m48[0m
+     If order.coupon_id is set but the coupon has been deleted from the 
+database, [1;35msession.query[0m[1m([0mCoupon[1m)[0m[1;35m.get[0m[1m([0m[1m)[0m will return [3;35mNone[0m, causing an 
+AttributeError on line [1;36m49[0m when accessing c.code. Add a null check: if c is [3;35mNone[0m,
+return [32m'coupon deleted'[0m or similar fallback message.
+
+[92m────────────────────────────── [0m[1;34mThe team responds[0m[92m ───────────────────────────────[0m
+A reviewer accepts some findings, rejects one, and states two conventions.
+
+[32maccepted:[0m F2, the logging finding
+[32mrule stored:[0m structured logger, never print
+[33m rule stored: no type hints on private helpers[0m
+[32mrule stored:[0m guard clauses over nested if/else
+[92m───────────────────── [0m[1;34mPR #[0m[1;34m2[0m[1;34m: Add order export for finance[0m[92m ──────────────────────[0m
+Different file, same team. Watch what it flags, and what it now deliberately 
+skips.
+
+[34m╭─[0m[34m─────────────────────────────[0m[34m Memolint review [0m[34m──────────────────────────────[0m[34m─╮[0m
+[34m│[0m [1mAdd order export for finance[0m  [2m(orderflow#2)[0m                                  [34m│[0m
+[34m│[0m [32mmemory on[0m | 18 memories recalled | 2053 in / 841 out tokens | via groq       [34m│[0m
+[34m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+[3mThis PR adds a nightly CSV export for settled orders, including a service layer [0m
+[3mand a CLI entry point. The implementation has a critical N+[0m[1;36m1[0m[3m query pattern that [0m
+[3mmatches a past incident, uses forbidden [0m[1;3;35mprint[0m[1;3m([0m[1;3m)[0m[3m statements, and silently [0m
+[3mswallows errors in the range export.[0m
+
+[1;31mF1  HIGH  [0m [1mN+[0m[1;36m1[0m[1m query pattern in export loop[0m  [2morderflow/services/export.py:[0m[1;2;36m25[0m
+     The loop calls `[1;35m_customer[0m[1m([0morder.customer_id[1m)[0m` for every order, resulting in
+one database query per item inside a loop. This is the exact shape of the past 
+incident in `orderflow/services/coupons.py` where per-item queries caused 
+performance degradation. Fix: fetch all required customers in a single query 
+using `[1;35msession.query[0m[1m([0mCustomer[1m)[0m[1;35m.filter[0m[1m([0m[1;35mCustomer.id.in_[0m[1m([0m[1m)[0m[1m)[0m[1;35m.all[0m[1m([0m[1m)[0m` and build a dict
+lookup, or use a JOIN in the initial query.
+     [35mprecedent:[0m Past incident in orderflow/services/coupons.py identified a 
+high-priority race condition and performance issues from per-item database 
+access patterns.
+
+[1;33mF2  MEDIUM[0m [1mUse of [0m[1;35mprint[0m[1m([0m[1m)[0m[1m for logging in service[0m  
+[2morderflow/services/export.py:[0m[1;2;36m21[0m
+     Line [1;36m21[0m and line [1;36m37[0m use `[1;35mprint[0m[1m([0m[1m)[0m` for logging. Team convention strictly 
+forbids `[1;35mprint[0m[1m([0m[1m)[0m` in services and requires `log = [1;35mget_logger[0m[1m([0m__name__[1m)[0m` from 
+`orderflow.logging` with structured fields. Replace with 
+`[1;35mlog.info[0m[1m([0m[32m"exporting_orders"[0m, [33mextra[0m=[1m{[0m[32m"count"[0m: [1;35mlen[0m[1m([0morders[1m)[0m, [32m"day"[0m: 
+[1;35mday.isoformat[0m[1m([0m[1m)[0m[1m}[0m[1m)[0m` and `[1;35mlog.info[0m[1m([0m[32m"export_complete"[0m, [33mextra[0m=[1m{[0m[32m"rows"[0m: written[1m}[0m[1m)[0m`.
+     [35mprecedent:[0m Team convention states that printing is not allowed in services 
+and to use [1;35mget_logger[0m[1m([0m__name__[1m)[0m from orderflow.logging.
+
+[1;33mF3  MEDIUM[0m [1mBare except clause swallows all errors[0m  
+[2morderflow/services/export.py:[0m[1;2;36m44[0m
+     The `except: pass` in `export_range` silently swallows all exceptions, 
+including `KeyboardInterrupt` and `SystemExit`, and hides real failures like 
+database connection errors or file permission issues. This makes debugging 
+nightly failures impossible. Fix: catch specific exceptions [1m([0me.g., `except 
+[1m([0mOSError, SQLAlchemyError[1m)[0m as e:`[1m)[0m and log the error with 
+`[1;35mlog.error[0m[1m([0m[32m"export_day_failed"[0m, [33mextra[0m=[1m{[0m[32m"day"[0m: [1;35mday.isoformat[0m[1m([0m[1m)[0m, [32m"error"[0m: 
+[1;35mstr[0m[1m([0me[1m)[0m[1m}[0m[1m)[0m`.
+     [35mprecedent:[0m Past review of orderflow/services/coupons.py identified a bare 
+except clause as a medium-priority issue.
+
+[1;36mF4  LOW   [0m [1mUse of [0m[1;35mprint[0m[1m([0m[1m)[0m[1m in CLI module[0m  [2morderflow/cli.py:[0m[1;2;36m14[0m
+     Line [1;36m14[0m uses `[1;35mprint[0m[1m([0mf"wrote [1m{[0mn[1m}[0m rows"[1m)[0m`. While CLI modules are less strict 
+than services, the team convention prefers structured logging. Consider using 
+`[1;35mlog.info[0m[1m([0m[32m"export_cli_complete"[0m, [33mextra[0m=[1m{[0m[32m"rows"[0m: n[1m}[0m[1m)[0m` for consistency, or at 
+minimum ensure this is acceptable for CLI user-facing output.
+     [35mprecedent:[0m Team convention for logging is to avoid [1;35mprint[0m[1m([0m[1m)[0m and instead use 
+[1;35mget_logger[0m[1m([0m__name__[1m)[0m from orderflow.logging.
+
+[3m                   Deliberately not raised (learned from you)                   [0m
+[2m┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓[0m
+[2m┃[0m[1m [0m[1mWould have said                      [0m[1m [0m[2m┃[0m[1m [0m[1mWhy not                             [0m[1m [0m[2m┃[0m
+[2m┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩[0m
+[2m│[0m Add type hints to private helper      [2m│[0m Team convention states that type     [2m│[0m
+[2m│[0m functions `_settled_orders` and       [2m│[0m hints are not required for private   [2m│[0m
+[2m│[0m `_customer`                           [2m│[0m helper functions (names starting     [2m│[0m
+[2m│[0m                                       [2m│[0m with an underscore).                 [2m│[0m
+[2m└───────────────────────────────────────┴──────────────────────────────────────┘[0m
+[92m────────────────────────────── [0m[1;34mThe team responds[0m[92m ───────────────────────────────[0m
+The N+[1;36m1[0m query finding gets accepted, and linked to a real outage.
+
+[32maccepted:[0m F1, the N+[1;36m1[0m finding
+[32mincident linked:[0m Sept [1;36m3[0m checkout outage
+[92m────────────────────── [0m[1;34mPR #[0m[1;34m3[0m[1;34m: Add refund summary endpoint[0m[92m ──────────────────────[0m
+First without memory [1m([0ma generic reviewer[1m)[0m, then with memory [1m([0mthis team's 
+reviewer[1m)[0m.
+
+[92m────────────────────────────────── [0m[31mmemory OFF[0m[92m ──────────────────────────────────[0m
+[34m╭─[0m[34m─────────────────────────────[0m[34m Memolint review [0m[34m──────────────────────────────[0m[34m─╮[0m
+[34m│[0m [1mAdd refund summary endpoint[0m  [2m(orderflow#3)[0m                                   [34m│[0m
+[34m│[0m [31mmemory off[0m | 902 in / 210 out tokens | via groq                              [34m│[0m
+[34m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+[3mThis PR adds a new endpoint to retrieve a list of refunds for a specific order, [0m
+[3mincluding their current status from the payment provider. The implementation is [0m
+[3mfunctionally correct but contains a performance anti-pattern that will degrade [0m
+[3munder load.[0m
+
+[1;31mF1  HIGH  [0m [1mN+[0m[1;36m1[0m[1m network calls in loop[0m  [2morderflow/api/refunds.py:[0m[1;2;36m27[0m
+     The loop iterates over all refunds and calls `[1;35m_provider_status[0m[1m([0mrefund[1m)[0m` for
+each one, which makes a separate network request to the payment provider per 
+refund. If an order has many refunds, this will cause significant latency and 
+potential rate-limiting issues. Consider batching the status requests if the 
+provider supports it, or caching the status if it doesn't change frequently.
+
+[92m────────────────────────────────── [0m[32mmemory ON[0m[92m ───────────────────────────────────[0m
+[34m╭─[0m[34m─────────────────────────────[0m[34m Memolint review [0m[34m──────────────────────────────[0m[34m─╮[0m
+[34m│[0m [1mAdd refund summary endpoint[0m  [2m(orderflow#3)[0m                                   [34m│[0m
+[34m│[0m [32mmemory on[0m | 26 memories recalled | 2381 in / 322 out tokens | via groq       [34m│[0m
+[34m╰──────────────────────────────────────────────────────────────────────────────╯[0m
+[3mThis PR adds a new endpoint to retrieve refund details for an order, including [0m
+[3mlive status from the payment provider. The implementation is functionally [0m
+[3mcorrect but contains a critical performance anti-pattern that directly repeats a[0m
+[3mpast production incident.[0m
+
+[1;31mF1  HIGH  [0m [1mN+[0m[1;36m1[0m[1m external API calls in loop[0m  [2morderflow/api/refunds.py:[0m[1;2;36m26[0m
+     The loop calls `[1;35m_provider_status[0m[1m([0mrefund[1m)[0m` for every refund, which makes one
+external API request per item. This is the exact shape of the bug that caused 
+the [1;36m41[0m-minute checkout outage on September [1;36m3[0m, [1;36m2026[0m. You must batch these 
+requests [1m([0me.g., `[1;35mprovider.get_refunds[0m[1m([0m[1m)[0m`[1m)[0m or parallelize them to avoid 
+exhausting the connection pool or hitting provider rate limits.
+     [35mprecedent:[0m The checkout outage on September [1;36m3[0m, [1;36m2026[0m, was caused by an N+[1;36m1[0m 
+query pattern where one call was made per item inside a loop, exhausting the 
+Postgres connection pool.
+
+[3m                   Deliberately not raised (learned from you)                   [0m
+[2m┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓[0m
+[2m┃[0m[1m [0m[1mWould have said                      [0m[1m [0m[2m┃[0m[1m [0m[1mWhy not                             [0m[1m [0m[2m┃[0m
+[2m┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩[0m
+[2m│[0m Add type hints to the private helper  [2m│[0m Team convention states that type     [2m│[0m
+[2m│[0m functions `_refunds_for` and          [2m│[0m hints are not required for private   [2m│[0m
+[2m│[0m `_provider_status`.                   [2m│[0m helper functions (names starting     [2m│[0m
+[2m│[0m                                       [2m│[0m with an underscore).                 [2m│[0m
+[2m└───────────────────────────────────────┴──────────────────────────────────────┘[0m
+[92m───────────────────────── [0m[1;34mWhat the reviewer now knows[0m[92m ──────────────────────────[0m
+[35mrule[0m Prefer guard clauses and early returns over nested if/else blocks.
+[35mrule[0m Do not ask for type hints on private helper functions [1m([0mnames starting with 
+_[1m)[0m. Only public functions need them.
+[35mrule[0m Never use [1;35mprint[0m[1m([0m[1m)[0m for logging. Use `log = [1;35mget_logger[0m[1m([0m__name__[1m)[0m` from 
+orderflow.logging and log structured fields.
+
+Run [1mmemolint memories --repo demo/orderflow[0m to see every memory, or [1mmemolint ask[0m
+[1;32m'what does this team care about?'[0m[1m --repo demo/orderflow[0m.

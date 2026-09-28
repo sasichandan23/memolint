@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
@@ -19,6 +20,7 @@ from .diff import DiffBundle, from_file, from_git, from_github_files, new_line_n
 from .github_client import GitHub, GitHubError, PRRef, parse_pr_ref
 from .llm import LLM, LLMError
 from .memory import Memory
+from .replay import find_marks, play
 from .reviewer import Review, format_markdown, learn_from_comments, review_diff
 from .state import find_finding, load_review, save_review
 
@@ -31,7 +33,16 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 app = typer.Typer(help="A code reviewer that remembers your team's precedents.")
-console = Console()
+# MEMOLINT_FORCE_COLOR keeps ANSI colour when output is redirected to a file, so a
+# captured transcript can be replayed later for screen recording.
+_FORCE_COLOR = bool(os.environ.get("MEMOLINT_FORCE_COLOR"))
+console = Console(
+    force_terminal=_FORCE_COLOR or None,
+    # On Windows rich would otherwise use win32 console calls and write no ANSI at all,
+    # so a redirected capture comes out colourless.
+    legacy_windows=False if _FORCE_COLOR else None,
+    color_system="truecolor" if _FORCE_COLOR else "auto",
+)
 
 SEV_COLOR = {"high": "red", "medium": "yellow", "low": "cyan"}
 
@@ -49,7 +60,6 @@ def _settings(require_llm: bool = True) -> Settings:
 def _repo_slug(explicit: Optional[str]) -> str:
     if explicit:
         return explicit
-    import os
     if os.getenv("MEMOLINT_REPO"):
         return os.environ["MEMOLINT_REPO"]
     try:
@@ -338,6 +348,27 @@ def reset(repo: Optional[str] = typer.Option(None), yes: bool = typer.Option(Fal
         raise typer.Exit()
     Memory(settings, bank_id_for(slug), slug).reset()
     console.print("[green]Bank reset.[/]")
+
+
+@app.command()
+def replay(
+    transcript: Path = typer.Argument(..., help="A captured demo transcript."),
+    speed: float = typer.Option(1.0, help="Playback speed. 1.4 is a good pace for video."),
+    start: int = typer.Option(0, help="First line to play."),
+    stop: Optional[int] = typer.Option(None, help="Last line to play."),
+    countdown: int = typer.Option(0, help="Seconds to count down before starting, to line up a recording."),
+    marks: bool = typer.Option(False, "--marks", help="List section cue points and exit."),
+):
+    """Replay a captured demo at a steady pace. Made for screen recording.
+
+    Capture one first:
+      MEMOLINT_FORCE_COLOR=1 memolint demo --auto > docs/demo-transcript.ansi
+    """
+    if marks:
+        for line_no, title in find_marks(transcript):
+            console.print(f"[cyan]{line_no:>4}[/]  {title}")
+        raise typer.Exit()
+    play(transcript, speed=speed, start=start, stop=stop, countdown=countdown)
 
 
 # ---------- demo ----------
