@@ -12,6 +12,18 @@ Submission repo: https://github.com/WaifuPuller/MemoLint
 - [x] Two LinkedIn posts written: `docs/linkedin-posts.md`
 - [x] Backing track is synthesised, so there is nothing to licence
 
+## Copy-paste packs
+
+Everything each of you needs is in its own folder, one file per destination:
+
+```
+docs/submit/team lead/      article.md  linkedin.txt  reddit.txt  README.md
+docs/submit/team member/    article.md  linkedin.txt  reddit.txt  README.md
+```
+
+Each file holds only the text to paste. The README in each folder has the steps.
+Regenerate them after editing any article with `python scripts/build_submit_packs.py`.
+
 ## Three different texts, three different places
 
 Do not paste the same thing everywhere. They are separate deliverables:

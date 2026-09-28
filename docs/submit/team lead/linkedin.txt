@@ -1,0 +1,22 @@
+The most valuable thing my code reviewer remembers isn't what it got right.
+
+It's what my team turned down.
+
+I gave it a persistent memory with Hindsight. What to store mattered more than which model:
+
+→ Accepted suggestions teach you little. It was already right.
+
+→ Rejections encode a judgment you can't read off the codebase.
+
+→ Rules belong in directives, not similarity search. A convention applies even when the diff looks unfamiliar.
+
+→ Incidents need shape matching. "One DB query per item in a loop" and "one API call per item in a loop" are the same bug.
+
+Before: a generic warning about sequential calls.
+After: high severity, naming the outage that pattern caused.
+
+The model is stateless. The bank isn't.
+
+Code: https://github.com/WaifuPuller/MemoLint
+
+#AIAgents #AgentMemory #LLM #AI

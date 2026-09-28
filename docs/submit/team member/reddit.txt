@@ -1,0 +1,3 @@
+I proved Hindsight worked, then found my test was broken
+
+[paste your published article URL into Reddit's link field]

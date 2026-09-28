@@ -1,0 +1,21 @@
+My before/after test showed the memory layer winning.
+
+Then I checked which model each half ran on.
+
+Different ones. Rate-limit failover had swapped models mid-comparison, and I nearly published it as evidence.
+
+What I changed:
+
+→ Pinned both halves to one provider. A fallback and an experiment want opposite things: one hides a failure, the other must stop on one.
+
+→ Made the run warn if the halves still differ. Four lines.
+
+→ Paced requests against a rolling token budget rather than waiting to be rate limited.
+
+→ Found a test passing while busy-waiting a full minute: I'd mocked sleep in a loop that needed the clock to move.
+
+Hindsight does make the reviewer better. I had to fix the measurement first.
+
+Code: https://github.com/WaifuPuller/MemoLint
+
+#AIAgents #AgentMemory #AIMemory #LLM
