@@ -12,6 +12,23 @@ Submission repo: https://github.com/WaifuPuller/MemoLint
 - [x] Two LinkedIn posts written: `docs/linkedin-posts.md`
 - [x] Backing track is synthesised, so there is nothing to licence
 
+## Three different texts, three different places
+
+Do not paste the same thing everywhere. They are separate deliverables:
+
+| Place | What goes there | Count |
+|---|---|---|
+| Dev.to / Medium / Hashnode | The full article, ~1,400 words | one per member |
+| LinkedIn | The short post, under 800 characters. Article URL goes in the first comment, not the body | one per member |
+| Reddit | A link post pointing at the article. No body text | one per member, different subreddits |
+| YouTube | The video | one per team |
+
+A LinkedIn *article* and a LinkedIn *post* are different features. The post is the short one.
+
+Minimum for eligibility: one article and one LinkedIn post each, plus one team video.
+
+Publish the article first, since the LinkedIn comment and the Reddit post both need its URL.
+
 ## Left to do, in order
 
 **1. Add a repository description on GitHub.** The About box is empty. Judges see it first.
