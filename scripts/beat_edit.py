@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -33,6 +34,24 @@ MONO, MONO_B = "C:/Windows/Fonts/consola.ttf", "C:/Windows/Fonts/consolab.ttf"
 UI_B, UI_BLK, UI = "C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/seguibl.ttf", "C:/Windows/Fonts/segoeui.ttf"
 
 LINES = json.loads((ROOT / "preview_data.json").read_text(encoding="utf-8"))["lines"]
+
+# The submission repo is published by someone else, so the end card must not be baked in.
+# Order of preference: --repo, then MEMOLINT_REPO_URL, then this repo's own git remote.
+PLACEHOLDER = "github.com/your-team/your-repo"
+
+
+def repo_url(explicit: str | None = None) -> str:
+    if explicit:
+        return explicit.replace("https://", "").replace("http://", "").rstrip("/")
+    env = os.environ.get("MEMOLINT_REPO_URL")
+    if env:
+        return env.replace("https://", "").replace("http://", "").rstrip("/")
+    try:
+        out = subprocess.run(["git", "remote", "get-url", "origin"], cwd=ROOT,
+                             capture_output=True, text=True, check=True).stdout.strip()
+        return out.replace("https://", "").replace("git@", "").replace(".git", "").replace(":", "/").rstrip("/")
+    except Exception:
+        return PLACEHOLDER
 
 
 def F(p, s):
@@ -183,15 +202,16 @@ class Card(Shot):
         tf = fit(d, self.title, UI_BLK, 104, W - 300)
         d.text((140, H // 2 - 150), self.title, font=tf, fill=INK)
         d.rectangle([144, H // 2 - 14, 264, H // 2 - 6], fill=HOT)
-        d.text((140, H // 2 + 30), self.sub, font=F(UI, 44), fill=DIM)
+        # The repo URL is supplied at render time and can be long, so it must shrink to fit.
+        d.text((140, H // 2 + 30), self.sub, font=fit(d, self.sub, UI, 44, W - 300), fill=DIM)
         if self.foot:
-            d.text((140, H - 160), self.foot, font=F(UI, 32), fill=FAINT)
+            d.text((140, H - 160), self.foot, font=fit(d, self.foot, UI, 32, W - 300), fill=FAINT)
         return img
 
 
 # ---------- the edit ----------
 
-def build_edit() -> list[Shot]:
+def build_edit(repo: str) -> list[Shot]:
     return [
         # cold open: state the problem in single words, one per beat
         Stinger("YOUR CODE REVIEWER", 2, size=120),
@@ -265,7 +285,7 @@ def build_edit() -> list[Shot]:
         Terminal(184, 193, 14),
         Stinger("THE MODEL IS STATELESS", 3, size=118),
         Stinger("THE MEMORY IS NOT", 4, colour=COOL, size=128),
-        Card("Memolint", "github.com/sasichandan23/trial-1",
+        Card("Memolint", repo,
              "Hindsight: github.com/vectorize-io/hindsight", beats=14),
     ]
 
@@ -281,9 +301,9 @@ def punch(img: Image.Image, t: float, strength: float) -> Image.Image:
     return img
 
 
-def render(bpm: float, audio: Path | None, out: Path) -> None:
+def render(bpm: float, audio: Path | None, out: Path, repo: str) -> None:
     beat = 60.0 / bpm
-    shots = build_edit()
+    shots = build_edit(repo)
     total_beats = sum(s.beats for s in shots)
 
     ff = __import__("imageio_ffmpeg").get_ffmpeg_exe()
@@ -319,13 +339,18 @@ if __name__ == "__main__":
     ap.add_argument("--bpm", type=float, default=150.0)
     ap.add_argument("--audio", type=Path, default=None)
     ap.add_argument("--out", type=Path, default=ROOT / "docs" / "memolint-edit.mp4")
+    ap.add_argument("--repo", default=None,
+                    help="Repo shown on the end card. Defaults to $MEMOLINT_REPO_URL, then the git remote.")
     ap.add_argument("--beats-only", action="store_true", help="Print the shot timings and exit.")
     a = ap.parse_args()
+    url = repo_url(a.repo)
+    if url == PLACEHOLDER:
+        print("warning: no repo URL found, the end card will show a placeholder")
     if a.beats_only:
         t = 0.0
-        for s in build_edit():
+        for s in build_edit(url):
             print(f"{t:7.2f}s  {s.beats:>2} beats  {type(s).__name__}")
             t += s.beats * 60.0 / a.bpm
         print(f"total {t:.1f}s")
     else:
-        render(a.bpm, a.audio, a.out)
+        render(a.bpm, a.audio, a.out, url)

@@ -40,6 +40,27 @@ memolint replay docs/demo-transcript.ansi --start 155 --stop 184 --speed 1.2
 | 155 | memory ON |
 | 184 | What the reviewer now knows |
 
+## Before you submit: set the repo URL
+
+The end card shows a repo URL, and the submission repo is published by the team lead under
+a different name from this working copy. Nothing is hardcoded, so once that repo exists,
+re-render with it:
+
+```bash
+python scripts/beat_edit.py --bpm 150 --audio docs/track.wav   --repo https://github.com/<lead>/<repo> --out docs/memolint-edit.mp4
+```
+
+Or set it once and forget the flag:
+
+```bash
+export MEMOLINT_REPO_URL=https://github.com/<lead>/<repo>
+```
+
+The URL is resolved in this order: `--repo`, then `MEMOLINT_REPO_URL`, then this checkout's
+own git remote. Rendering takes a few minutes and nothing else changes, so do this last,
+after the repo is final. The card shrinks the text to fit, so a long URL is safe. Update the
+YouTube description at the bottom of this file to match.
+
 ## The edit
 
 Music: one upbeat track, around 100-120 BPM, starting quiet. Cut on the beat. Suggested
@@ -136,7 +157,7 @@ Screen: `memolint ask "what does this team care about?"` output, then the repo U
 > Voice: "The model is stateless. The memory isn't. That's the whole trick, and it runs
 > entirely on free tiers."
 
-`[TEXT] github.com/<your-repo>`
+`[TEXT]` the submission repo URL
 
 ---
 
@@ -177,7 +198,7 @@ Paste under the video, with the repo URL filled in.
 > same model reviews the same diff twice, and the version with memory connects a per-item
 > API call to an outage caused by a per-item database query.
 >
-> Code: <your repo URL>
+> Code: <the submission repo URL>
 > Hindsight: https://github.com/vectorize-io/hindsight
 > Docs: https://hindsight.vectorize.io/
 > Agent memory: https://vectorize.io/what-is-agent-memory

@@ -129,7 +129,7 @@ def _hex(c: str) -> tuple[int, int, int]:
     return (int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16))
 
 
-def render(speed: float, out: Path, audio: Path | None, font_size: int) -> None:
+def render(speed: float, out: Path, audio: Path | None, font_size: int, repo: str) -> None:
     data = json.loads((ROOT / "preview_data.json").read_text(encoding="utf-8"))
     lines = data["lines"]
     r = Renderer(font_size)
@@ -181,8 +181,7 @@ def render(speed: float, out: Path, audio: Path | None, font_size: int) -> None:
             proc.stdin.write(frame.tobytes())
             frames_since_cut += 1
 
-    push(r.card("The model is stateless.", "The memory is not.",
-                "github.com/sasichandan23/trial-1"), 3.4)
+    push(r.card("The model is stateless.", "The memory is not.", repo), 3.4)
 
     proc.stdin.close()
     proc.wait()
@@ -195,5 +194,9 @@ if __name__ == "__main__":
     ap.add_argument("--out", type=Path, default=ROOT / "docs" / "memolint-demo.mp4")
     ap.add_argument("--audio", type=Path, default=None)
     ap.add_argument("--font-size", type=int, default=25)
+    ap.add_argument("--repo", default=None,
+                    help="Repo shown on the end card. Defaults to $MEMOLINT_REPO_URL, then the git remote.")
     a = ap.parse_args()
-    render(a.speed, a.out, a.audio, a.font_size)
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from beat_edit import repo_url  # one source of truth for how the URL is resolved
+    render(a.speed, a.out, a.audio, a.font_size, repo_url(a.repo))
