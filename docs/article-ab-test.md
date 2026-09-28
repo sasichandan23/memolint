@@ -135,4 +135,4 @@ None of this is specific to memory systems, but memory is where it bit me, becau
 
 The agent does get meaningfully better when it remembers what a team told it. I just had to fix my measurement before I could honestly say so.
 
-*Code: <REPO_URL>*
+*Code: https://github.com/WaifuPuller/MemoLint*

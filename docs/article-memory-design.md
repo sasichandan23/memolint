@@ -125,4 +125,4 @@ None of this is specific to code review. Any agent that serves the same people r
 
 The model I'm running is not the smartest one available. It doesn't need to be. It just needs to remember what we told it.
 
-*Code: <REPO_URL>*
+*Code: https://github.com/WaifuPuller/MemoLint*

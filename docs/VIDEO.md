@@ -47,13 +47,13 @@ a different name from this working copy. Nothing is hardcoded, so once that repo
 re-render with it:
 
 ```bash
-python scripts/beat_edit.py --bpm 150 --audio docs/track.wav   --repo https://github.com/<lead>/<repo> --out docs/memolint-edit.mp4
+python scripts/beat_edit.py --bpm 150 --audio docs/track.wav   --repo https://github.com/WaifuPuller/MemoLint --out docs/memolint-edit.mp4
 ```
 
 Or set it once and forget the flag:
 
 ```bash
-export MEMOLINT_REPO_URL=https://github.com/<lead>/<repo>
+export MEMOLINT_REPO_URL=https://github.com/WaifuPuller/MemoLint
 ```
 
 The URL is resolved in this order: `--repo`, then `MEMOLINT_REPO_URL`, then this checkout's
@@ -198,7 +198,7 @@ Paste under the video, with the repo URL filled in.
 > same model reviews the same diff twice, and the version with memory connects a per-item
 > API call to an outage caused by a per-item database query.
 >
-> Code: <the submission repo URL>
+> Code: https://github.com/WaifuPuller/MemoLint
 > Hindsight: https://github.com/vectorize-io/hindsight
 > Docs: https://hindsight.vectorize.io/
 > Agent memory: https://vectorize.io/what-is-agent-memory
