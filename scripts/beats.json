@@ -1,0 +1,44 @@
+[
+  {
+    "from": 0,
+    "caption": "0 memories",
+    "label": "PR 1 - cold"
+  },
+  {
+    "from": 59,
+    "caption": "the team answers back",
+    "label": "Feedback"
+  },
+  {
+    "from": 66,
+    "caption": "15 memories recalled",
+    "label": "PR 2"
+  },
+  {
+    "from": 129,
+    "caption": "linked to a real outage",
+    "label": "Incident"
+  },
+  {
+    "from": 134,
+    "caption": "same diff, reviewed twice",
+    "label": "PR 3"
+  },
+  {
+    "from": 138,
+    "caption": "memory OFF",
+    "label": "Memory off",
+    "badge": "memory off"
+  },
+  {
+    "from": 155,
+    "caption": "it remembered the outage",
+    "label": "Memory on",
+    "badge": "memory on"
+  },
+  {
+    "from": 184,
+    "caption": "3 rules learned",
+    "label": "Close"
+  }
+]

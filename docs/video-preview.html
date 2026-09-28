@@ -1,0 +1,280 @@
+<title>Memolint Cut</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,400;0,600;0,900;1,400&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #eef1f4;
+    --ink-dim: #97a3b0;
+    --ink-faint: #5d6a77;
+    --ground: #10141a;
+    --stage: #0a0d12;
+    --panel: #171d25;
+    --line: #262f3a;
+    --hot: #ff6a3d;
+    --cool: #5ad1c4;
+    --warn: #ffc857;
+    --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --ui: "Chivo", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--ui); -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 16px; padding-block: 28px 56px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px; margin-bottom: 18px; }
+  h1 { font-size: clamp(22px, 3.4vw, 34px); font-weight: 900; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+  .sub { color: var(--ink-dim); font-size: 14px; margin: 0; max-width: 60ch; }
+  .runtime {
+    margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-faint);
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; white-space: nowrap;
+  }
+
+  /* ---- stage ---- */
+  .stage {
+    position: relative; background: var(--stage); border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden; aspect-ratio: 16 / 9; min-height: 300px;
+  }
+  .chrome {
+    height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 12px;
+    background: #12171e; border-bottom: 1px solid var(--line);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #303b47; }
+  .chrome span { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-left: 6px; }
+
+  .screen {
+    position: absolute; inset: 30px 0 0 0; overflow: hidden; padding: 14px 16px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.45;
+  }
+  .screen .feed { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%; }
+  .screen b { font-weight: 700; }
+  .ln { white-space: pre; }
+
+  /* burned-in caption, lower third */
+  .caption {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 22px 20px;
+    background: linear-gradient(to top, rgba(6,9,13,.93) 35%, rgba(6,9,13,0));
+    pointer-events: none;
+  }
+  .caption .big {
+    font-weight: 900; font-size: clamp(19px, 3.1vw, 32px); letter-spacing: -0.02em;
+    text-transform: lowercase; line-height: 1.05;
+  }
+  .caption .big::after { content: ""; display: block; height: 3px; width: 46px; background: var(--hot); margin-top: 9px; }
+  .caption.flash .big { animation: pop .42s cubic-bezier(.2,.9,.25,1); }
+  @keyframes pop { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+
+  .badge {
+    position: absolute; top: 42px; right: 16px; font-family: var(--mono); font-size: 11px;
+    letter-spacing: .09em; text-transform: uppercase; padding: 5px 10px; border-radius: 4px;
+    background: rgba(10,13,18,.82); border: 1px solid var(--line); color: var(--ink-dim);
+  }
+  .badge.off { color: var(--hot); border-color: color-mix(in srgb, var(--hot) 45%, var(--line)); }
+  .badge.on  { color: var(--cool); border-color: color-mix(in srgb, var(--cool) 45%, var(--line)); }
+
+  .curtain {
+    position: absolute; inset: 30px 0 0 0; display: grid; place-content: center; gap: 14px;
+    justify-items: center; background: rgba(8,11,15,.72); backdrop-filter: blur(2px);
+  }
+  .curtain p { margin: 0; color: var(--ink-dim); font-size: 13px; }
+  .play {
+    width: 66px; height: 66px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--hot); color: #14181d; display: grid; place-content: center;
+  }
+  .play svg { width: 24px; height: 24px; margin-left: 4px; }
+  .play:hover { transform: scale(1.05); }
+  .play, .curtain { transition: opacity .25s ease; }
+
+  /* ---- transport ---- */
+  .transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
+  button.ctl {
+    font-family: var(--ui); font-size: 13px; font-weight: 600; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 7px;
+    padding: 8px 14px; cursor: pointer;
+  }
+  button.ctl:hover { border-color: var(--ink-faint); }
+  button.ctl[aria-pressed="true"] { background: var(--hot); border-color: var(--hot); color: #14181d; }
+  .spd { display: flex; gap: 5px; margin-left: auto; align-items: center; }
+  .spd small { color: var(--ink-faint); font-size: 12px; margin-right: 3px; }
+  .spd button { padding: 7px 11px; font-family: var(--mono); font-size: 12px; }
+  :focus-visible { outline: 2px solid var(--cool); outline-offset: 2px; }
+
+  .track { margin-top: 12px; display: grid; gap: 3px; grid-auto-flow: column; grid-auto-columns: 1fr; }
+  .seg {
+    border: none; text-align: left; cursor: pointer; padding: 9px 9px 11px;
+    background: var(--panel); border-top: 3px solid var(--line); color: var(--ink-faint);
+    font-family: var(--ui); font-size: 11px; line-height: 1.25; min-height: 52px;
+  }
+  .seg:hover { color: var(--ink-dim); }
+  .seg[data-live="1"] { color: var(--ink); border-top-color: var(--hot); background: #1d242e; }
+  .seg em { display: block; font-family: var(--mono); font-style: normal; font-size: 10px; color: var(--ink-faint); margin-top: 3px; }
+
+  /* ---- script ---- */
+  .script { margin-top: 22px; display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 760px) { .script { grid-template-columns: 1fr; } .track { grid-auto-flow: row; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 16px 18px; }
+  .card h2 {
+    margin: 0 0 9px; font-size: 11px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600;
+  }
+  .vo { margin: 0; font-size: 16px; line-height: 1.55; max-width: 60ch; }
+  .vo::before { content: "\201C"; color: var(--hot); font-size: 26px; line-height: 0; vertical-align: -3px; margin-right: 3px; }
+  .steps { margin: 0; padding-left: 17px; font-size: 13.5px; line-height: 1.65; color: var(--ink-dim); }
+  .steps code {
+    font-family: var(--mono); font-size: 12px; background: #0e1219; border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 5px; color: var(--warn);
+  }
+  footer { margin-top: 26px; color: var(--ink-faint); font-size: 12.5px; line-height: 1.6; max-width: 72ch; }
+  @media (prefers-reduced-motion: reduce) { .caption.flash .big { animation: none; } .play:hover { transform: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>The cut, before you shoot it</h1>
+      <p class="sub">Terminal footage played at recording speed, with the captions burned over it. Watch it first, then record the same thing.</p>
+    </div>
+    <div class="runtime" id="runtime">&mdash;</div>
+  </header>
+
+  <div class="stage">
+    <div class="chrome"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span id="cmd">memolint demo</span></div>
+    <div class="screen"><div class="feed" id="feed"></div></div>
+    <div class="badge" id="badge" hidden></div>
+    <div class="caption" id="cap"><div class="big" id="capText"></div></div>
+    <div class="curtain" id="curtain">
+      <button class="play" id="playBig" aria-label="Play preview">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <p>64 seconds of footage at 1.4&times;</p>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button class="ctl" id="toggle">Play</button>
+    <button class="ctl" id="restart">Restart</button>
+    <div class="spd">
+      <small>speed</small>
+      <button class="ctl spd-btn" data-s="1">1.0</button>
+      <button class="ctl spd-btn" data-s="1.4" aria-pressed="true">1.4</button>
+      <button class="ctl spd-btn" data-s="1.8">1.8</button>
+    </div>
+  </div>
+
+  <div class="track" id="track"></div>
+
+  <div class="script">
+    <div class="card">
+      <h2>Voiceover for this beat</h2>
+      <p class="vo" id="vo"></p>
+    </div>
+    <div class="card">
+      <h2>Record it yourself</h2>
+      <ol class="steps">
+        <li>Terminal at 18pt or larger, dark theme, nothing else on screen.</li>
+        <li>Start capture with <code>Win+Alt+R</code>.</li>
+        <li>Run <code>memolint replay docs/demo-transcript.ansi --speed 1.4 --countdown 3</code>.</li>
+        <li>Record the voiceover separately, reading to picture.</li>
+        <li>Cut to music and burn in the captions above.</li>
+      </ol>
+    </div>
+  </div>
+
+  <footer>
+    This is a preview of the terminal track only, so there is no music, no talking head and no
+    B-roll. Every line on screen came from a real run against Hindsight and Groq. The full shot
+    list, titles and thumbnail prompt are in <code>docs/VIDEO.md</code>.
+  </footer>
+</div>
+
+<script>
+  const DATA = {"lines":[{"s":[{"t":"Demo memory bank wiped.","c":null,"b":false}],"d":0.164},{"s":[{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 ","c":"#b5e890","b":false},{"t":"PR #","c":"#61afef","b":true},{"t":"1","c":"#61afef","b":true},{"t":": Add coupon validation","c":"#61afef","b":true},{"t":" \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#b5e890","b":false}],"d":0.786},{"s":[{"t":"Fresh bank. The reviewer knows nothing about this team yet.","c":null,"b":false}],"d":0.393},{"s":[],"d":0.071},{"s":[{"t":"\u256d\u2500","c":"#61afef","b":false},{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#61afef","b":false},{"t":" Memolint review ","c":"#61afef","b":false},{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#61afef","b":false},{"t":"\u2500\u256e","c":"#61afef","b":false}],"d":0.786},{"s":[{"t":"\u2502","c":"#61afef","b":false},{"t":" ","c":null,"b":false},{"t":"Add coupon validation to checkout","c":null,"b":true},{"t":"  ","c":null,"b":false},{"t":"(orderflow#1)","c":null,"b":false},{"t":"                             ","c":null,"b":false},{"t":"\u2502","c":"#61afef","b":false}],"d":0.021},{"s":[{"t":"\u2502","c":"#61afef","b":false},{"t":" ","c":null,"b":false},{"t":"memory on","c":"#98c379","b":false},{"t":" | 0 memories recalled | 1008 in / 830 out tokens | via groq        ","c":null,"b":false},{"t":"\u2502","c":"#61afef","b":false}],"d":0.021},{"s":[{"t":"\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f","c":"#61afef","b":false}],"d":0.786},{"s":[{"t":"This PR adds coupon validation and application logic to the checkout flow, ","c":null,"b":false}],"d":0.393},{"s":[{"t":"including expiry, usage limits, and minimum order total checks. The ","c":null,"b":false}],"d":0.393},{"s":[{"t":"implementation has several issues including race conditions, lack of error ","c":null,"b":false}],"d":0.393},{"s":[{"t":"handling, and potential data integrity problems that need to be addressed before","c":null,"b":false}],"d":0.393},{"s":[{"t":"merging.","c":null,"b":false}],"d":0.057},{"s":[],"d":0.071},{"s":[{"t":"F1  HIGH  ","c":"#e06c75","b":true},{"t":" ","c":null,"b":false},{"t":"Race condition in coupon usage count","c":null,"b":true},{"t":"  ","c":null,"b":false}],"d":0.336},{"s":[{"t":"orderflow/services/coupons.py:","c":null,"b":false},{"t":"19","c":"#56b6c2","b":true}],"d":0.229},{"s":[{"t":"     The _usage_count check on line ","c":null,"b":false},{"t":"19","c":"#56b6c2","b":true},{"t":" is not atomic with the subsequent ","c":null,"b":false}],"d":0.393},{"s":[{"t":"order.coupon_id assignment on line ","c":null,"b":false},{"t":"24","c":"#56b6c2","b":true},{"t":". Multiple concurrent requests could all ","c":null,"b":false}],"d":0.393},{"s":[{"t":"pass the usage limit check and exceed max_uses. Use a database-level constraint ","c":null,"b":false}],"d":0.393},{"s":[{"t":"or SELECT ","c":null,"b":false},{"t":"...","c":"#e5c07b","b":false},{"t":" FOR UPDATE to make this atomic, or implement optimistic locking ","c":null,"b":false}],"d":0.393},{"s":[{"t":"with a version column on the Coupon model.","c":null,"b":false}],"d":0.3},{"s":[],"d":0.071},{"s":[{"t":"F2  MEDIUM","c":"#e5c07b","b":true},{"t":" ","c":null,"b":false},{"t":"Missing error handling for coupon application","c":null,"b":true},{"t":"  ","c":null,"b":false}],"d":0.393},{"s":[{"t":"orderflow/services/coupons.py:","c":null,"b":false},{"t":"15","c":"#56b6c2","b":true}],"d":0.229},{"s":[{"t":"     The apply_coupon function doesn't handle database errors or validation ","c":null,"b":false}],"d":0.393},{"s":[{"t":"failures. If the session.query fails or the order is in an invalid state, the ","c":null,"b":false}],"d":0.393},{"s":[{"t":"function will crash. Add try/except blocks with appropriate logging and return ","c":null,"b":false}],"d":0.393},{"s":[{"t":"meaningful error states or raise specific exceptions that the caller can handle.","c":null,"b":false}],"d":0.393},{"s":[],"d":0.071},{"s":[{"t":"F3  MEDIUM","c":"#e5c07b","b":true},{"t":" ","c":null,"b":false},{"t":"Using ","c":null,"b":true},{"t":"datetime.utcnow","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":" is deprecated","c":null,"b":true},{"t":"  ","c":null,"b":false}],"d":0.343},{"s":[{"t":"orderflow/services/coupons.py:","c":null,"b":false},{"t":"17","c":"#56b6c2","b":true}],"d":0.229},{"s":[{"t":"     ","c":null,"b":false},{"t":"datetime.utcnow","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":" is deprecated in Python ","c":null,"b":false},{"t":"3.12","c":"#56b6c2","b":true},{"t":"+ and can cause timezone ","c":null,"b":false}],"d":0.393},{"s":[{"t":"confusion. Use ","c":null,"b":false},{"t":"datetime.now","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"timezone.utc","c":null,"b":false},{"t":")","c":null,"b":true},{"t":" instead to get a timezone-aware ","c":null,"b":false}],"d":0.393},{"s":[{"t":"datetime object. This ensures consistent behavior across different system ","c":null,"b":false}],"d":0.393},{"s":[{"t":"timezones and avoids subtle bugs when comparing with timezone-aware database ","c":null,"b":false}],"d":0.393},{"s":[{"t":"timestamps.","c":null,"b":false}],"d":0.079},{"s":[],"d":0.071},{"s":[{"t":"F4  MEDIUM","c":"#e5c07b","b":true},{"t":" ","c":null,"b":false},{"t":"Bare except clause in remove_coupon","c":null,"b":true},{"t":"  ","c":null,"b":false},{"t":"orderflow/services/coupons.py:","c":null,"b":false},{"t":"38","c":"#56b6c2","b":true}],"d":0.393},{"s":[{"t":"     The bare except on line ","c":null,"b":false},{"t":"38","c":"#56b6c2","b":true},{"t":" catches all exceptions including ","c":null,"b":false}],"d":0.393},{"s":[{"t":"KeyboardInterrupt and SystemExit, which can mask serious errors. Catch specific ","c":null,"b":false}],"d":0.393},{"s":[{"t":"exceptions like SQLAlchemyError or IntegrityError, and log the exception with ","c":null,"b":false}],"d":0.393},{"s":[{"t":"context before rolling back. This makes debugging much easier and prevents ","c":null,"b":false}],"d":0.393},{"s":[{"t":"accidentally swallowing critical errors.","c":null,"b":false}],"d":0.286},{"s":[],"d":0.071},{"s":[{"t":"F5  MEDIUM","c":"#e5c07b","b":true},{"t":" ","c":null,"b":false},{"t":"Missing session commit in apply_coupon","c":null,"b":true},{"t":"  ","c":null,"b":false}],"d":0.35},{"s":[{"t":"orderflow/services/coupons.py:","c":null,"b":false},{"t":"24","c":"#56b6c2","b":true}],"d":0.229},{"s":[{"t":"     The apply_coupon function modifies order.discount and order.coupon_id but ","c":null,"b":false}],"d":0.393},{"s":[{"t":"never calls ","c":null,"b":false},{"t":"session.commit","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":". This means the changes will only be persisted if ","c":null,"b":false}],"d":0.393},{"s":[{"t":"the caller commits, which is error-prone. Either commit within this function ","c":null,"b":false}],"d":0.393},{"s":[{"t":"(","c":null,"b":true},{"t":"with proper error handling","c":null,"b":false},{"t":")","c":null,"b":true},{"t":" or document clearly that the caller must commit, ","c":null,"b":false}],"d":0.393},{"s":[{"t":"and consider returning a success/failure indicator.","c":null,"b":false}],"d":0.364},{"s":[],"d":0.071},{"s":[{"t":"F6  LOW   ","c":"#56b6c2","b":true},{"t":" ","c":null,"b":false},{"t":"Potential ","c":null,"b":true},{"t":"None","c":"#c678dd","b":true},{"t":" reference in coupon_summary","c":null,"b":true},{"t":"  ","c":null,"b":false}],"d":0.379},{"s":[{"t":"orderflow/services/coupons.py:","c":null,"b":false},{"t":"48","c":"#56b6c2","b":true}],"d":0.229},{"s":[{"t":"     If order.coupon_id is set but the coupon has been deleted from the ","c":null,"b":false}],"d":0.393},{"s":[{"t":"database, ","c":null,"b":false},{"t":"session.query","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"Coupon","c":null,"b":false},{"t":")","c":null,"b":true},{"t":".get","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":" will return ","c":null,"b":false},{"t":"None","c":"#c678dd","b":false},{"t":", causing an ","c":null,"b":false}],"d":0.393},{"s":[{"t":"AttributeError on line ","c":null,"b":false},{"t":"49","c":"#56b6c2","b":true},{"t":" when accessing c.code. Add a null check: if c is ","c":null,"b":false},{"t":"None","c":"#c678dd","b":false},{"t":",","c":null,"b":false}],"d":0.393},{"s":[{"t":"return ","c":null,"b":false},{"t":"'coupon deleted'","c":"#98c379","b":false},{"t":" or similar fallback message.","c":null,"b":false}],"d":0.371},{"s":[],"d":0.071},{"s":[{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 ","c":"#b5e890","b":false},{"t":"The team responds","c":"#61afef","b":true},{"t":" \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#b5e890","b":false}],"d":0.786},{"s":[{"t":"A reviewer accepts some findings, rejects one, and states two conventions.","c":null,"b":false}],"d":0.393},{"s":[],"d":0.071},{"s":[{"t":"accepted:","c":"#98c379","b":false},{"t":" F2, the logging finding","c":null,"b":false}],"d":0.236},{"s":[{"t":"rule stored:","c":"#98c379","b":false},{"t":" structured logger, never print","c":null,"b":false}],"d":0.307},{"s":[{"t":" rule stored: no type hints on private helpers","c":"#e5c07b","b":false}],"d":0.329},{"s":[{"t":"rule stored:","c":"#98c379","b":false},{"t":" guard clauses over nested if/else","c":null,"b":false}],"d":0.329},{"s":[{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 ","c":"#b5e890","b":false},{"t":"PR #","c":"#61afef","b":true},{"t":"2","c":"#61afef","b":true},{"t":": Add order export for finance","c":"#61afef","b":true},{"t":" \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#b5e890","b":false}],"d":0.786},{"s":[{"t":"Different file, same team. Watch what it flags, and what it now deliberately ","c":null,"b":false}],"d":0.393},{"s":[{"t":"skips.","c":null,"b":false}],"d":0.043},{"s":[],"d":0.071},{"s":[{"t":"\u256d\u2500","c":"#61afef","b":false},{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#61afef","b":false},{"t":" Memolint review ","c":"#61afef","b":false},{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#61afef","b":false},{"t":"\u2500\u256e","c":"#61afef","b":false}],"d":0.786},{"s":[{"t":"\u2502","c":"#61afef","b":false},{"t":" ","c":null,"b":false},{"t":"Add order export for finance","c":null,"b":true},{"t":"  ","c":null,"b":false},{"t":"(orderflow#2)","c":null,"b":false},{"t":"                                  ","c":null,"b":false},{"t":"\u2502","c":"#61afef","b":false}],"d":0.021},{"s":[{"t":"\u2502","c":"#61afef","b":false},{"t":" ","c":null,"b":false},{"t":"memory on","c":"#98c379","b":false},{"t":" | 18 memories recalled | 2053 in / 841 out tokens | via groq       ","c":null,"b":false},{"t":"\u2502","c":"#61afef","b":false}],"d":0.021},{"s":[{"t":"\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f","c":"#61afef","b":false}],"d":0.786},{"s":[{"t":"This PR adds a nightly CSV export for settled orders, including a service layer ","c":null,"b":false}],"d":0.393},{"s":[{"t":"and a CLI entry point. The implementation has a critical N+","c":null,"b":false},{"t":"1","c":"#56b6c2","b":true},{"t":" query pattern that ","c":null,"b":false}],"d":0.393},{"s":[{"t":"matches a past incident, uses forbidden ","c":null,"b":false},{"t":"print","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":" statements, and silently ","c":null,"b":false}],"d":0.393},{"s":[{"t":"swallows errors in the range export.","c":null,"b":false}],"d":0.257},{"s":[],"d":0.071},{"s":[{"t":"F1  HIGH  ","c":"#e06c75","b":true},{"t":" ","c":null,"b":false},{"t":"N+","c":null,"b":true},{"t":"1","c":"#56b6c2","b":true},{"t":" query pattern in export loop","c":null,"b":true},{"t":"  ","c":null,"b":false},{"t":"orderflow/services/export.py:","c":null,"b":false},{"t":"25","c":"#56b6c2","b":true}],"d":0.393},{"s":[{"t":"     The loop calls `","c":null,"b":false},{"t":"_customer","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"order.customer_id","c":null,"b":false},{"t":")","c":null,"b":true},{"t":"` for every order, resulting in","c":null,"b":false}],"d":0.393},{"s":[{"t":"one database query per item inside a loop. This is the exact shape of the past ","c":null,"b":false}],"d":0.393},{"s":[{"t":"incident in `orderflow/services/coupons.py` where per-item queries caused ","c":null,"b":false}],"d":0.393},{"s":[{"t":"performance degradation. Fix: fetch all required customers in a single query ","c":null,"b":false}],"d":0.393},{"s":[{"t":"using `","c":null,"b":false},{"t":"session.query","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"Customer","c":null,"b":false},{"t":")","c":null,"b":true},{"t":".filter","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"Customer.id.in_","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":")","c":null,"b":true},{"t":".all","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":"` and build a dict","c":null,"b":false}],"d":0.393},{"s":[{"t":"lookup, or use a JOIN in the initial query.","c":null,"b":false}],"d":0.307},{"s":[{"t":"     ","c":null,"b":false},{"t":"precedent:","c":"#c678dd","b":false},{"t":" Past incident in orderflow/services/coupons.py identified a ","c":null,"b":false}],"d":0.393},{"s":[{"t":"high-priority race condition and performance issues from per-item database ","c":null,"b":false}],"d":0.393},{"s":[{"t":"access patterns.","c":null,"b":false}],"d":0.114},{"s":[],"d":0.071},{"s":[{"t":"F2  MEDIUM","c":"#e5c07b","b":true},{"t":" ","c":null,"b":false},{"t":"Use of ","c":null,"b":true},{"t":"print","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":" for logging in service","c":null,"b":true},{"t":"  ","c":null,"b":false}],"d":0.343},{"s":[{"t":"orderflow/services/export.py:","c":null,"b":false},{"t":"21","c":"#56b6c2","b":true}],"d":0.221},{"s":[{"t":"     Line ","c":null,"b":false},{"t":"21","c":"#56b6c2","b":true},{"t":" and line ","c":null,"b":false},{"t":"37","c":"#56b6c2","b":true},{"t":" use `","c":null,"b":false},{"t":"print","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":"` for logging. Team convention strictly ","c":null,"b":false}],"d":0.393},{"s":[{"t":"forbids `","c":null,"b":false},{"t":"print","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":"` in services and requires `log = ","c":null,"b":false},{"t":"get_logger","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"__name__","c":null,"b":false},{"t":")","c":null,"b":true},{"t":"` from ","c":null,"b":false}],"d":0.393},{"s":[{"t":"`orderflow.logging` with structured fields. Replace with ","c":null,"b":false}],"d":0.393},{"s":[{"t":"`","c":null,"b":false},{"t":"log.info","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"\"exporting_orders\"","c":"#98c379","b":false},{"t":", ","c":null,"b":false},{"t":"extra","c":"#e5c07b","b":false},{"t":"=","c":null,"b":false},{"t":"{","c":null,"b":true},{"t":"\"count\"","c":"#98c379","b":false},{"t":": ","c":null,"b":false},{"t":"len","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"orders","c":null,"b":false},{"t":")","c":null,"b":true},{"t":", ","c":null,"b":false},{"t":"\"day\"","c":"#98c379","b":false},{"t":": ","c":null,"b":false}],"d":0.393},{"s":[{"t":"day.isoformat","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":"}","c":null,"b":true},{"t":")","c":null,"b":true},{"t":"` and `","c":null,"b":false},{"t":"log.info","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"\"export_complete\"","c":"#98c379","b":false},{"t":", ","c":null,"b":false},{"t":"extra","c":"#e5c07b","b":false},{"t":"=","c":null,"b":false},{"t":"{","c":null,"b":true},{"t":"\"rows\"","c":"#98c379","b":false},{"t":": written","c":null,"b":false},{"t":"}","c":null,"b":true},{"t":")","c":null,"b":true},{"t":"`.","c":null,"b":false}],"d":0.393},{"s":[{"t":"     ","c":null,"b":false},{"t":"precedent:","c":"#c678dd","b":false},{"t":" Team convention states that printing is not allowed in services ","c":null,"b":false}],"d":0.393},{"s":[{"t":"and to use ","c":null,"b":false},{"t":"get_logger","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"__name__","c":null,"b":false},{"t":")","c":null,"b":true},{"t":" from orderflow.logging.","c":null,"b":false}],"d":0.393},{"s":[],"d":0.071},{"s":[{"t":"F3  MEDIUM","c":"#e5c07b","b":true},{"t":" ","c":null,"b":false},{"t":"Bare except clause swallows all errors","c":null,"b":true},{"t":"  ","c":null,"b":false}],"d":0.35},{"s":[{"t":"orderflow/services/export.py:","c":null,"b":false},{"t":"44","c":"#56b6c2","b":true}],"d":0.221},{"s":[{"t":"     The `except: pass` in `export_range` silently swallows all exceptions, ","c":null,"b":false}],"d":0.393},{"s":[{"t":"including `KeyboardInterrupt` and `SystemExit`, and hides real failures like ","c":null,"b":false}],"d":0.393},{"s":[{"t":"database connection errors or file permission issues. This makes debugging ","c":null,"b":false}],"d":0.393},{"s":[{"t":"nightly failures impossible. Fix: catch specific exceptions ","c":null,"b":false},{"t":"(","c":null,"b":true},{"t":"e.g., `except ","c":null,"b":false}],"d":0.393},{"s":[{"t":"(","c":null,"b":true},{"t":"OSError, SQLAlchemyError","c":null,"b":false},{"t":")","c":null,"b":true},{"t":" as e:`","c":null,"b":false},{"t":")","c":null,"b":true},{"t":" and log the error with ","c":null,"b":false}],"d":0.393},{"s":[{"t":"`","c":null,"b":false},{"t":"log.error","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"\"export_day_failed\"","c":"#98c379","b":false},{"t":", ","c":null,"b":false},{"t":"extra","c":"#e5c07b","b":false},{"t":"=","c":null,"b":false},{"t":"{","c":null,"b":true},{"t":"\"day\"","c":"#98c379","b":false},{"t":": ","c":null,"b":false},{"t":"day.isoformat","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":", ","c":null,"b":false},{"t":"\"error\"","c":"#98c379","b":false},{"t":": ","c":null,"b":false}],"d":0.393},{"s":[{"t":"str","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"e","c":null,"b":false},{"t":")","c":null,"b":true},{"t":"}","c":null,"b":true},{"t":")","c":null,"b":true},{"t":"`.","c":null,"b":false}],"d":0.071},{"s":[{"t":"     ","c":null,"b":false},{"t":"precedent:","c":"#c678dd","b":false},{"t":" Past review of orderflow/services/coupons.py identified a bare ","c":null,"b":false}],"d":0.393},{"s":[{"t":"except clause as a medium-priority issue.","c":null,"b":false}],"d":0.293},{"s":[],"d":0.071},{"s":[{"t":"F4  LOW   ","c":"#56b6c2","b":true},{"t":" ","c":null,"b":false},{"t":"Use of ","c":null,"b":true},{"t":"print","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":" in CLI module","c":null,"b":true},{"t":"  ","c":null,"b":false},{"t":"orderflow/cli.py:","c":null,"b":false},{"t":"14","c":"#56b6c2","b":true}],"d":0.393},{"s":[{"t":"     Line ","c":null,"b":false},{"t":"14","c":"#56b6c2","b":true},{"t":" uses `","c":null,"b":false},{"t":"print","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"f\"wrote ","c":null,"b":false},{"t":"{","c":null,"b":true},{"t":"n","c":null,"b":false},{"t":"}","c":null,"b":true},{"t":" rows\"","c":null,"b":false},{"t":")","c":null,"b":true},{"t":"`. While CLI modules are less strict ","c":null,"b":false}],"d":0.393},{"s":[{"t":"than services, the team convention prefers structured logging. Consider using ","c":null,"b":false}],"d":0.393},{"s":[{"t":"`","c":null,"b":false},{"t":"log.info","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"\"export_cli_complete\"","c":"#98c379","b":false},{"t":", ","c":null,"b":false},{"t":"extra","c":"#e5c07b","b":false},{"t":"=","c":null,"b":false},{"t":"{","c":null,"b":true},{"t":"\"rows\"","c":"#98c379","b":false},{"t":": n","c":null,"b":false},{"t":"}","c":null,"b":true},{"t":")","c":null,"b":true},{"t":"` for consistency, or at ","c":null,"b":false}],"d":0.393},{"s":[{"t":"minimum ensure this is acceptable for CLI user-facing output.","c":null,"b":false}],"d":0.393},{"s":[{"t":"     ","c":null,"b":false},{"t":"precedent:","c":"#c678dd","b":false},{"t":" Team convention for logging is to avoid ","c":null,"b":false},{"t":"print","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":" and instead use ","c":null,"b":false}],"d":0.393},{"s":[{"t":"get_logger","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"__name__","c":null,"b":false},{"t":")","c":null,"b":true},{"t":" from orderflow.logging.","c":null,"b":false}],"d":0.314},{"s":[],"d":0.071},{"s":[{"t":"                   Deliberately not raised (learned from you)                   ","c":null,"b":false}],"d":0.393},{"s":[{"t":"\u250f\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2513","c":null,"b":false}],"d":0.393},{"s":[{"t":"\u2503","c":null,"b":false},{"t":" ","c":null,"b":true},{"t":"Would have said                      ","c":null,"b":true},{"t":" ","c":null,"b":true},{"t":"\u2503","c":null,"b":false},{"t":" ","c":null,"b":true},{"t":"Why not                             ","c":null,"b":true},{"t":" ","c":null,"b":true},{"t":"\u2503","c":null,"b":false}],"d":0.393},{"s":[{"t":"\u2521\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2529","c":null,"b":false}],"d":0.393},{"s":[{"t":"\u2502","c":null,"b":false},{"t":" Add type hints to private helper      ","c":null,"b":false},{"t":"\u2502","c":null,"b":false},{"t":" Team convention states that type     ","c":null,"b":false},{"t":"\u2502","c":null,"b":false}],"d":0.021},{"s":[{"t":"\u2502","c":null,"b":false},{"t":" functions `_settled_orders` and       ","c":null,"b":false},{"t":"\u2502","c":null,"b":false},{"t":" hints are not required for private   ","c":null,"b":false},{"t":"\u2502","c":null,"b":false}],"d":0.021},{"s":[{"t":"\u2502","c":null,"b":false},{"t":" `_customer`                           ","c":null,"b":false},{"t":"\u2502","c":null,"b":false},{"t":" helper functions (names starting     ","c":null,"b":false},{"t":"\u2502","c":null,"b":false}],"d":0.021},{"s":[{"t":"\u2502","c":null,"b":false},{"t":"                                       ","c":null,"b":false},{"t":"\u2502","c":null,"b":false},{"t":" with an underscore).                 ","c":null,"b":false},{"t":"\u2502","c":null,"b":false}],"d":0.021},{"s":[{"t":"\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518","c":null,"b":false}],"d":0.786},{"s":[{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 ","c":"#b5e890","b":false},{"t":"The team responds","c":"#61afef","b":true},{"t":" \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#b5e890","b":false}],"d":0.786},{"s":[{"t":"The N+","c":null,"b":false},{"t":"1","c":"#56b6c2","b":true},{"t":" query finding gets accepted, and linked to a real outage.","c":null,"b":false}],"d":0.393},{"s":[],"d":0.071},{"s":[{"t":"accepted:","c":"#98c379","b":false},{"t":" F1, the N+","c":null,"b":false},{"t":"1","c":"#56b6c2","b":true},{"t":" finding","c":null,"b":false}],"d":0.207},{"s":[{"t":"incident linked:","c":"#98c379","b":false},{"t":" Sept ","c":null,"b":false},{"t":"3","c":"#56b6c2","b":true},{"t":" checkout outage","c":null,"b":false}],"d":0.279},{"s":[{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 ","c":"#b5e890","b":false},{"t":"PR #","c":"#61afef","b":true},{"t":"3","c":"#61afef","b":true},{"t":": Add refund summary endpoint","c":"#61afef","b":true},{"t":" \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#b5e890","b":false}],"d":0.786},{"s":[{"t":"First without memory ","c":null,"b":false},{"t":"(","c":null,"b":true},{"t":"a generic reviewer","c":null,"b":false},{"t":")","c":null,"b":true},{"t":", then with memory ","c":null,"b":false},{"t":"(","c":null,"b":true},{"t":"this team's ","c":null,"b":false}],"d":0.393},{"s":[{"t":"reviewer","c":null,"b":false},{"t":")","c":null,"b":true},{"t":".","c":null,"b":false}],"d":0.071},{"s":[],"d":0.071},{"s":[{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 ","c":"#b5e890","b":false},{"t":"memory OFF","c":"#e06c75","b":false},{"t":" \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#b5e890","b":false}],"d":0.786},{"s":[{"t":"\u256d\u2500","c":"#61afef","b":false},{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#61afef","b":false},{"t":" Memolint review ","c":"#61afef","b":false},{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#61afef","b":false},{"t":"\u2500\u256e","c":"#61afef","b":false}],"d":0.786},{"s":[{"t":"\u2502","c":"#61afef","b":false},{"t":" ","c":null,"b":false},{"t":"Add refund summary endpoint","c":null,"b":true},{"t":"  ","c":null,"b":false},{"t":"(orderflow#3)","c":null,"b":false},{"t":"                                   ","c":null,"b":false},{"t":"\u2502","c":"#61afef","b":false}],"d":0.021},{"s":[{"t":"\u2502","c":"#61afef","b":false},{"t":" ","c":null,"b":false},{"t":"memory off","c":"#e06c75","b":false},{"t":" | 902 in / 210 out tokens | via groq                              ","c":null,"b":false},{"t":"\u2502","c":"#61afef","b":false}],"d":0.021},{"s":[{"t":"\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f","c":"#61afef","b":false}],"d":0.786},{"s":[{"t":"This PR adds a new endpoint to retrieve a list of refunds for a specific order, ","c":null,"b":false}],"d":0.393},{"s":[{"t":"including their current status from the payment provider. The implementation is ","c":null,"b":false}],"d":0.393},{"s":[{"t":"functionally correct but contains a performance anti-pattern that will degrade ","c":null,"b":false}],"d":0.393},{"s":[{"t":"under load.","c":null,"b":false}],"d":0.079},{"s":[],"d":0.071},{"s":[{"t":"F1  HIGH  ","c":"#e06c75","b":true},{"t":" ","c":null,"b":false},{"t":"N+","c":null,"b":true},{"t":"1","c":"#56b6c2","b":true},{"t":" network calls in loop","c":null,"b":true},{"t":"  ","c":null,"b":false},{"t":"orderflow/api/refunds.py:","c":null,"b":false},{"t":"27","c":"#56b6c2","b":true}],"d":0.393},{"s":[{"t":"     The loop iterates over all refunds and calls `","c":null,"b":false},{"t":"_provider_status","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"refund","c":null,"b":false},{"t":")","c":null,"b":true},{"t":"` for","c":null,"b":false}],"d":0.393},{"s":[{"t":"each one, which makes a separate network request to the payment provider per ","c":null,"b":false}],"d":0.393},{"s":[{"t":"refund. If an order has many refunds, this will cause significant latency and ","c":null,"b":false}],"d":0.393},{"s":[{"t":"potential rate-limiting issues. Consider batching the status requests if the ","c":null,"b":false}],"d":0.393},{"s":[{"t":"provider supports it, or caching the status if it doesn't change frequently.","c":null,"b":false}],"d":0.393},{"s":[],"d":0.071},{"s":[{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 ","c":"#b5e890","b":false},{"t":"memory ON","c":"#98c379","b":false},{"t":" \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#b5e890","b":false}],"d":0.786},{"s":[{"t":"\u256d\u2500","c":"#61afef","b":false},{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#61afef","b":false},{"t":" Memolint review ","c":"#61afef","b":false},{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#61afef","b":false},{"t":"\u2500\u256e","c":"#61afef","b":false}],"d":0.786},{"s":[{"t":"\u2502","c":"#61afef","b":false},{"t":" ","c":null,"b":false},{"t":"Add refund summary endpoint","c":null,"b":true},{"t":"  ","c":null,"b":false},{"t":"(orderflow#3)","c":null,"b":false},{"t":"                                   ","c":null,"b":false},{"t":"\u2502","c":"#61afef","b":false}],"d":0.021},{"s":[{"t":"\u2502","c":"#61afef","b":false},{"t":" ","c":null,"b":false},{"t":"memory on","c":"#98c379","b":false},{"t":" | 26 memories recalled | 2381 in / 322 out tokens | via groq       ","c":null,"b":false},{"t":"\u2502","c":"#61afef","b":false}],"d":0.021},{"s":[{"t":"\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f","c":"#61afef","b":false}],"d":0.786},{"s":[{"t":"This PR adds a new endpoint to retrieve refund details for an order, including ","c":null,"b":false}],"d":0.393},{"s":[{"t":"live status from the payment provider. The implementation is functionally ","c":null,"b":false}],"d":0.393},{"s":[{"t":"correct but contains a critical performance anti-pattern that directly repeats a","c":null,"b":false}],"d":0.393},{"s":[{"t":"past production incident.","c":null,"b":false}],"d":0.179},{"s":[],"d":0.071},{"s":[{"t":"F1  HIGH  ","c":"#e06c75","b":true},{"t":" ","c":null,"b":false},{"t":"N+","c":null,"b":true},{"t":"1","c":"#56b6c2","b":true},{"t":" external API calls in loop","c":null,"b":true},{"t":"  ","c":null,"b":false},{"t":"orderflow/api/refunds.py:","c":null,"b":false},{"t":"26","c":"#56b6c2","b":true}],"d":0.393},{"s":[{"t":"     The loop calls `","c":null,"b":false},{"t":"_provider_status","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"refund","c":null,"b":false},{"t":")","c":null,"b":true},{"t":"` for every refund, which makes one","c":null,"b":false}],"d":0.393},{"s":[{"t":"external API request per item. This is the exact shape of the bug that caused ","c":null,"b":false}],"d":0.393},{"s":[{"t":"the ","c":null,"b":false},{"t":"41","c":"#56b6c2","b":true},{"t":"-minute checkout outage on September ","c":null,"b":false},{"t":"3","c":"#56b6c2","b":true},{"t":", ","c":null,"b":false},{"t":"2026","c":"#56b6c2","b":true},{"t":". You must batch these ","c":null,"b":false}],"d":0.393},{"s":[{"t":"requests ","c":null,"b":false},{"t":"(","c":null,"b":true},{"t":"e.g., `","c":null,"b":false},{"t":"provider.get_refunds","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":"`","c":null,"b":false},{"t":")","c":null,"b":true},{"t":" or parallelize them to avoid ","c":null,"b":false}],"d":0.393},{"s":[{"t":"exhausting the connection pool or hitting provider rate limits.","c":null,"b":false}],"d":0.393},{"s":[{"t":"     ","c":null,"b":false},{"t":"precedent:","c":"#c678dd","b":false},{"t":" The checkout outage on September ","c":null,"b":false},{"t":"3","c":"#56b6c2","b":true},{"t":", ","c":null,"b":false},{"t":"2026","c":"#56b6c2","b":true},{"t":", was caused by an N+","c":null,"b":false},{"t":"1","c":"#56b6c2","b":true},{"t":" ","c":null,"b":false}],"d":0.393},{"s":[{"t":"query pattern where one call was made per item inside a loop, exhausting the ","c":null,"b":false}],"d":0.393},{"s":[{"t":"Postgres connection pool.","c":null,"b":false}],"d":0.179},{"s":[],"d":0.071},{"s":[{"t":"                   Deliberately not raised (learned from you)                   ","c":null,"b":false}],"d":0.393},{"s":[{"t":"\u250f\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2513","c":null,"b":false}],"d":0.393},{"s":[{"t":"\u2503","c":null,"b":false},{"t":" ","c":null,"b":true},{"t":"Would have said                      ","c":null,"b":true},{"t":" ","c":null,"b":true},{"t":"\u2503","c":null,"b":false},{"t":" ","c":null,"b":true},{"t":"Why not                             ","c":null,"b":true},{"t":" ","c":null,"b":true},{"t":"\u2503","c":null,"b":false}],"d":0.393},{"s":[{"t":"\u2521\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2529","c":null,"b":false}],"d":0.393},{"s":[{"t":"\u2502","c":null,"b":false},{"t":" Add type hints to the private helper  ","c":null,"b":false},{"t":"\u2502","c":null,"b":false},{"t":" Team convention states that type     ","c":null,"b":false},{"t":"\u2502","c":null,"b":false}],"d":0.021},{"s":[{"t":"\u2502","c":null,"b":false},{"t":" functions `_refunds_for` and          ","c":null,"b":false},{"t":"\u2502","c":null,"b":false},{"t":" hints are not required for private   ","c":null,"b":false},{"t":"\u2502","c":null,"b":false}],"d":0.021},{"s":[{"t":"\u2502","c":null,"b":false},{"t":" `_provider_status`.                   ","c":null,"b":false},{"t":"\u2502","c":null,"b":false},{"t":" helper functions (names starting     ","c":null,"b":false},{"t":"\u2502","c":null,"b":false}],"d":0.021},{"s":[{"t":"\u2502","c":null,"b":false},{"t":"                                       ","c":null,"b":false},{"t":"\u2502","c":null,"b":false},{"t":" with an underscore).                 ","c":null,"b":false},{"t":"\u2502","c":null,"b":false}],"d":0.021},{"s":[{"t":"\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518","c":null,"b":false}],"d":0.786},{"s":[{"t":"\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 ","c":"#b5e890","b":false},{"t":"What the reviewer now knows","c":"#61afef","b":true},{"t":" \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500","c":"#b5e890","b":false}],"d":0.786},{"s":[{"t":"rule","c":"#c678dd","b":false},{"t":" Prefer guard clauses and early returns over nested if/else blocks.","c":null,"b":false}],"d":0.393},{"s":[{"t":"rule","c":"#c678dd","b":false},{"t":" Do not ask for type hints on private helper functions ","c":null,"b":false},{"t":"(","c":null,"b":true},{"t":"names starting with ","c":null,"b":false}],"d":0.393},{"s":[{"t":"_","c":null,"b":false},{"t":")","c":null,"b":true},{"t":". Only public functions need them.","c":null,"b":false}],"d":0.257},{"s":[{"t":"rule","c":"#c678dd","b":false},{"t":" Never use ","c":null,"b":false},{"t":"print","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":")","c":null,"b":true},{"t":" for logging. Use `log = ","c":null,"b":false},{"t":"get_logger","c":"#c678dd","b":true},{"t":"(","c":null,"b":true},{"t":"__name__","c":null,"b":false},{"t":")","c":null,"b":true},{"t":"` from ","c":null,"b":false}],"d":0.393},{"s":[{"t":"orderflow.logging and log structured fields.","c":null,"b":false}],"d":0.314},{"s":[],"d":0.071},{"s":[{"t":"Run ","c":null,"b":false},{"t":"memolint memories --repo demo/orderflow","c":null,"b":true},{"t":" to see every memory, or ","c":null,"b":false},{"t":"memolint ask","c":null,"b":true}],"d":0.393},{"s":[{"t":"'what does this team care about?'","c":"#98c379","b":true},{"t":" --repo demo/orderflow","c":null,"b":true},{"t":".","c":null,"b":false}],"d":0.393}],"beats":[{"from":0,"caption":"0 memories","label":"PR 1 \u2014 cold","voice":"First pull request. The memory bank is empty, so this is a normal review. Nothing here you couldn't get from any other tool."},{"from":59,"caption":"the team answers back","label":"Feedback","voice":"Then a human answers. One suggestion was right. One was wrong for this team. Two conventions get written down."},{"from":66,"caption":"15 memories recalled","label":"PR 2 \u2014 it changed","voice":"Second pull request, different file. Now every finding cites the rule behind it. And it's quietly not raising the one we rejected."},{"from":129,"caption":"linked to a real outage","label":"Incident","voice":"The N plus one finding gets accepted, and tied to an outage that took checkout down for forty-one minutes."},{"from":134,"caption":"same diff, reviewed twice","label":"PR 3","voice":"Third pull request. We review it twice."},{"from":138,"caption":"memory OFF","label":"Memory off","voice":"Memory off. A generic performance warning. Correct, and forgettable."},{"from":155,"caption":"it remembered the outage","label":"Memory on","voice":"Memory on. Same model, same diff. It connects a per-item API call to an outage caused by a per-item database query. Nobody told it those were the same bug."},{"from":184,"caption":"3 rules learned","label":"Close","voice":"The model is stateless. The memory isn't. That's the whole trick, and it runs entirely on free tiers."}]};
+  const lines = DATA.lines, beats = DATA.beats;
+  const feed = document.getElementById("feed"), cap = document.getElementById("cap"),
+        capText = document.getElementById("capText"), badge = document.getElementById("badge"),
+        track = document.getElementById("track"), vo = document.getElementById("vo"),
+        toggle = document.getElementById("toggle"), curtain = document.getElementById("curtain"),
+        runtime = document.getElementById("runtime");
+
+  let speed = 1.4, i = 0, timer = null, playing = false, beatIdx = -1;
+
+  const totalAt = s => lines.reduce((t, l) => t + l.d * 1.4 / s, 0);
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+  const beatFor = n => { let b = 0; beats.forEach((x, k) => { if (n >= x.from) b = k; }); return b; };
+
+  function renderLine(l) {
+    const div = document.createElement("div");
+    div.className = "ln";
+    if (!l.s.length) div.textContent = " ";
+    for (const sp of l.s) {
+      const el = sp.b ? document.createElement("b") : document.createElement("span");
+      if (sp.c) el.style.color = sp.c;
+      el.textContent = sp.t;
+      div.appendChild(el);
+    }
+    feed.appendChild(div);
+    while (feed.childNodes.length > 60) feed.removeChild(feed.firstChild);
+  }
+
+  function setBeat(k) {
+    if (k === beatIdx) return;
+    beatIdx = k;
+    const b = beats[k];
+    capText.textContent = b.caption;
+    vo.textContent = b.voice;
+    cap.classList.remove("flash"); void cap.offsetWidth; cap.classList.add("flash");
+    const off = b.label === "Memory off", on = b.label === "Memory on";
+    badge.hidden = !(off || on);
+    badge.textContent = off ? "memory off" : "memory on";
+    badge.className = "badge " + (off ? "off" : "on");
+    [...track.children].forEach((el, n) => el.dataset.live = n === k ? "1" : "0");
+  }
+
+  function step() {
+    if (i >= lines.length) { stop(); toggle.textContent = "Replay"; return; }
+    renderLine(lines[i]);
+    setBeat(beatFor(i));
+    const d = lines[i].d * 1.4 / speed;
+    i++;
+    timer = setTimeout(step, Math.max(12, d * 1000));
+  }
+
+  function start() {
+    if (i >= lines.length) { feed.textContent = ""; i = 0; beatIdx = -1; }
+    playing = true; toggle.textContent = "Pause"; curtain.style.opacity = "0";
+    setTimeout(() => curtain.hidden = true, 250);
+    step();
+  }
+  function stop() { playing = false; clearTimeout(timer); toggle.textContent = "Play"; }
+
+  toggle.onclick = () => playing ? stop() : start();
+  document.getElementById("playBig").onclick = start;
+  document.getElementById("restart").onclick = () => {
+    stop(); feed.textContent = ""; i = 0; beatIdx = -1; setBeat(0); start();
+  };
+  document.querySelectorAll(".spd-btn").forEach(b => b.onclick = () => {
+    speed = parseFloat(b.dataset.s);
+    document.querySelectorAll(".spd-btn").forEach(o => o.setAttribute("aria-pressed", o === b));
+    runtime.textContent = fmt(totalAt(speed)) + " of footage";
+  });
+
+  beats.forEach((b, k) => {
+    const el = document.createElement("button");
+    el.className = "seg"; el.dataset.live = "0";
+    el.innerHTML = `${b.label}<em>line ${b.from}</em>`;
+    el.onclick = () => {
+      stop(); feed.textContent = "";
+      const from = Math.max(0, b.from - 3);
+      for (let n = from; n < b.from; n++) renderLine(lines[n]);
+      i = b.from; beatIdx = -1; setBeat(k);
+      curtain.hidden = true; start();
+    };
+    track.appendChild(el);
+  });
+
+  // At rest the stage already shows real output, so the first frame is never blank.
+  for (let n = 0; n < 16; n++) renderLine(lines[n]);
+  setBeat(0);
+  runtime.textContent = fmt(totalAt(speed)) + " of footage";
+</script>

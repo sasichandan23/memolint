@@ -1,0 +1,280 @@
+<title>Memolint Cut</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,400;0,600;0,900;1,400&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #eef1f4;
+    --ink-dim: #97a3b0;
+    --ink-faint: #5d6a77;
+    --ground: #10141a;
+    --stage: #0a0d12;
+    --panel: #171d25;
+    --line: #262f3a;
+    --hot: #ff6a3d;
+    --cool: #5ad1c4;
+    --warn: #ffc857;
+    --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --ui: "Chivo", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--ui); -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 16px; padding-block: 28px 56px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px; margin-bottom: 18px; }
+  h1 { font-size: clamp(22px, 3.4vw, 34px); font-weight: 900; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+  .sub { color: var(--ink-dim); font-size: 14px; margin: 0; max-width: 60ch; }
+  .runtime {
+    margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-faint);
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; white-space: nowrap;
+  }
+
+  /* ---- stage ---- */
+  .stage {
+    position: relative; background: var(--stage); border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden; aspect-ratio: 16 / 9; min-height: 300px;
+  }
+  .chrome {
+    height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 12px;
+    background: #12171e; border-bottom: 1px solid var(--line);
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #303b47; }
+  .chrome span { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-left: 6px; }
+
+  .screen {
+    position: absolute; inset: 30px 0 0 0; overflow: hidden; padding: 14px 16px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.45;
+  }
+  .screen .feed { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%; }
+  .screen b { font-weight: 700; }
+  .ln { white-space: pre; }
+
+  /* burned-in caption, lower third */
+  .caption {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 22px 20px;
+    background: linear-gradient(to top, rgba(6,9,13,.93) 35%, rgba(6,9,13,0));
+    pointer-events: none;
+  }
+  .caption .big {
+    font-weight: 900; font-size: clamp(19px, 3.1vw, 32px); letter-spacing: -0.02em;
+    text-transform: lowercase; line-height: 1.05;
+  }
+  .caption .big::after { content: ""; display: block; height: 3px; width: 46px; background: var(--hot); margin-top: 9px; }
+  .caption.flash .big { animation: pop .42s cubic-bezier(.2,.9,.25,1); }
+  @keyframes pop { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+
+  .badge {
+    position: absolute; top: 42px; right: 16px; font-family: var(--mono); font-size: 11px;
+    letter-spacing: .09em; text-transform: uppercase; padding: 5px 10px; border-radius: 4px;
+    background: rgba(10,13,18,.82); border: 1px solid var(--line); color: var(--ink-dim);
+  }
+  .badge.off { color: var(--hot); border-color: color-mix(in srgb, var(--hot) 45%, var(--line)); }
+  .badge.on  { color: var(--cool); border-color: color-mix(in srgb, var(--cool) 45%, var(--line)); }
+
+  .curtain {
+    position: absolute; inset: 30px 0 0 0; display: grid; place-content: center; gap: 14px;
+    justify-items: center; background: rgba(8,11,15,.72); backdrop-filter: blur(2px);
+  }
+  .curtain p { margin: 0; color: var(--ink-dim); font-size: 13px; }
+  .play {
+    width: 66px; height: 66px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--hot); color: #14181d; display: grid; place-content: center;
+  }
+  .play svg { width: 24px; height: 24px; margin-left: 4px; }
+  .play:hover { transform: scale(1.05); }
+  .play, .curtain { transition: opacity .25s ease; }
+
+  /* ---- transport ---- */
+  .transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
+  button.ctl {
+    font-family: var(--ui); font-size: 13px; font-weight: 600; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 7px;
+    padding: 8px 14px; cursor: pointer;
+  }
+  button.ctl:hover { border-color: var(--ink-faint); }
+  button.ctl[aria-pressed="true"] { background: var(--hot); border-color: var(--hot); color: #14181d; }
+  .spd { display: flex; gap: 5px; margin-left: auto; align-items: center; }
+  .spd small { color: var(--ink-faint); font-size: 12px; margin-right: 3px; }
+  .spd button { padding: 7px 11px; font-family: var(--mono); font-size: 12px; }
+  :focus-visible { outline: 2px solid var(--cool); outline-offset: 2px; }
+
+  .track { margin-top: 12px; display: grid; gap: 3px; grid-auto-flow: column; grid-auto-columns: 1fr; }
+  .seg {
+    border: none; text-align: left; cursor: pointer; padding: 9px 9px 11px;
+    background: var(--panel); border-top: 3px solid var(--line); color: var(--ink-faint);
+    font-family: var(--ui); font-size: 11px; line-height: 1.25; min-height: 52px;
+  }
+  .seg:hover { color: var(--ink-dim); }
+  .seg[data-live="1"] { color: var(--ink); border-top-color: var(--hot); background: #1d242e; }
+  .seg em { display: block; font-family: var(--mono); font-style: normal; font-size: 10px; color: var(--ink-faint); margin-top: 3px; }
+
+  /* ---- script ---- */
+  .script { margin-top: 22px; display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 760px) { .script { grid-template-columns: 1fr; } .track { grid-auto-flow: row; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 16px 18px; }
+  .card h2 {
+    margin: 0 0 9px; font-size: 11px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-faint); font-weight: 600;
+  }
+  .vo { margin: 0; font-size: 16px; line-height: 1.55; max-width: 60ch; }
+  .vo::before { content: "\201C"; color: var(--hot); font-size: 26px; line-height: 0; vertical-align: -3px; margin-right: 3px; }
+  .steps { margin: 0; padding-left: 17px; font-size: 13.5px; line-height: 1.65; color: var(--ink-dim); }
+  .steps code {
+    font-family: var(--mono); font-size: 12px; background: #0e1219; border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 5px; color: var(--warn);
+  }
+  footer { margin-top: 26px; color: var(--ink-faint); font-size: 12.5px; line-height: 1.6; max-width: 72ch; }
+  @media (prefers-reduced-motion: reduce) { .caption.flash .big { animation: none; } .play:hover { transform: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>The cut, before you shoot it</h1>
+      <p class="sub">Terminal footage played at recording speed, with the captions burned over it. Watch it first, then record the same thing.</p>
+    </div>
+    <div class="runtime" id="runtime">&mdash;</div>
+  </header>
+
+  <div class="stage">
+    <div class="chrome"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span id="cmd">memolint demo</span></div>
+    <div class="screen"><div class="feed" id="feed"></div></div>
+    <div class="badge" id="badge" hidden></div>
+    <div class="caption" id="cap"><div class="big" id="capText"></div></div>
+    <div class="curtain" id="curtain">
+      <button class="play" id="playBig" aria-label="Play preview">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <p>64 seconds of footage at 1.4&times;</p>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button class="ctl" id="toggle">Play</button>
+    <button class="ctl" id="restart">Restart</button>
+    <div class="spd">
+      <small>speed</small>
+      <button class="ctl spd-btn" data-s="1">1.0</button>
+      <button class="ctl spd-btn" data-s="1.4" aria-pressed="true">1.4</button>
+      <button class="ctl spd-btn" data-s="1.8">1.8</button>
+    </div>
+  </div>
+
+  <div class="track" id="track"></div>
+
+  <div class="script">
+    <div class="card">
+      <h2>Voiceover for this beat</h2>
+      <p class="vo" id="vo"></p>
+    </div>
+    <div class="card">
+      <h2>Record it yourself</h2>
+      <ol class="steps">
+        <li>Terminal at 18pt or larger, dark theme, nothing else on screen.</li>
+        <li>Start capture with <code>Win+Alt+R</code>.</li>
+        <li>Run <code>memolint replay docs/demo-transcript.ansi --speed 1.4 --countdown 3</code>.</li>
+        <li>Record the voiceover separately, reading to picture.</li>
+        <li>Cut to music and burn in the captions above.</li>
+      </ol>
+    </div>
+  </div>
+
+  <footer>
+    This is a preview of the terminal track only, so there is no music, no talking head and no
+    B-roll. Every line on screen came from a real run against Hindsight and Groq. The full shot
+    list, titles and thumbnail prompt are in <code>docs/VIDEO.md</code>.
+  </footer>
+</div>
+
+<script>
+  const DATA = /*__DATA__*/null;
+  const lines = DATA.lines, beats = DATA.beats;
+  const feed = document.getElementById("feed"), cap = document.getElementById("cap"),
+        capText = document.getElementById("capText"), badge = document.getElementById("badge"),
+        track = document.getElementById("track"), vo = document.getElementById("vo"),
+        toggle = document.getElementById("toggle"), curtain = document.getElementById("curtain"),
+        runtime = document.getElementById("runtime");
+
+  let speed = 1.4, i = 0, timer = null, playing = false, beatIdx = -1;
+
+  const totalAt = s => lines.reduce((t, l) => t + l.d * 1.4 / s, 0);
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+  const beatFor = n => { let b = 0; beats.forEach((x, k) => { if (n >= x.from) b = k; }); return b; };
+
+  function renderLine(l) {
+    const div = document.createElement("div");
+    div.className = "ln";
+    if (!l.s.length) div.textContent = " ";
+    for (const sp of l.s) {
+      const el = sp.b ? document.createElement("b") : document.createElement("span");
+      if (sp.c) el.style.color = sp.c;
+      el.textContent = sp.t;
+      div.appendChild(el);
+    }
+    feed.appendChild(div);
+    while (feed.childNodes.length > 60) feed.removeChild(feed.firstChild);
+  }
+
+  function setBeat(k) {
+    if (k === beatIdx) return;
+    beatIdx = k;
+    const b = beats[k];
+    capText.textContent = b.caption;
+    vo.textContent = b.voice;
+    cap.classList.remove("flash"); void cap.offsetWidth; cap.classList.add("flash");
+    const off = b.label === "Memory off", on = b.label === "Memory on";
+    badge.hidden = !(off || on);
+    badge.textContent = off ? "memory off" : "memory on";
+    badge.className = "badge " + (off ? "off" : "on");
+    [...track.children].forEach((el, n) => el.dataset.live = n === k ? "1" : "0");
+  }
+
+  function step() {
+    if (i >= lines.length) { stop(); toggle.textContent = "Replay"; return; }
+    renderLine(lines[i]);
+    setBeat(beatFor(i));
+    const d = lines[i].d * 1.4 / speed;
+    i++;
+    timer = setTimeout(step, Math.max(12, d * 1000));
+  }
+
+  function start() {
+    if (i >= lines.length) { feed.textContent = ""; i = 0; beatIdx = -1; }
+    playing = true; toggle.textContent = "Pause"; curtain.style.opacity = "0";
+    setTimeout(() => curtain.hidden = true, 250);
+    step();
+  }
+  function stop() { playing = false; clearTimeout(timer); toggle.textContent = "Play"; }
+
+  toggle.onclick = () => playing ? stop() : start();
+  document.getElementById("playBig").onclick = start;
+  document.getElementById("restart").onclick = () => {
+    stop(); feed.textContent = ""; i = 0; beatIdx = -1; setBeat(0); start();
+  };
+  document.querySelectorAll(".spd-btn").forEach(b => b.onclick = () => {
+    speed = parseFloat(b.dataset.s);
+    document.querySelectorAll(".spd-btn").forEach(o => o.setAttribute("aria-pressed", o === b));
+    runtime.textContent = fmt(totalAt(speed)) + " of footage";
+  });
+
+  beats.forEach((b, k) => {
+    const el = document.createElement("button");
+    el.className = "seg"; el.dataset.live = "0";
+    el.innerHTML = `${b.label}<em>line ${b.from}</em>`;
+    el.onclick = () => {
+      stop(); feed.textContent = "";
+      const from = Math.max(0, b.from - 3);
+      for (let n = from; n < b.from; n++) renderLine(lines[n]);
+      i = b.from; beatIdx = -1; setBeat(k);
+      curtain.hidden = true; start();
+    };
+    track.appendChild(el);
+  });
+
+  // At rest the stage already shows real output, so the first frame is never blank.
+  for (let n = 0; n < 16; n++) renderLine(lines[n]);
+  setBeat(0);
+  runtime.textContent = fmt(totalAt(speed)) + " of footage";
+</script>

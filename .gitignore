@@ -10,3 +10,6 @@ build/
 .idea/
 .vscode/
 .memolint/
+preview_data.json
+*.mp4
+*.wav
