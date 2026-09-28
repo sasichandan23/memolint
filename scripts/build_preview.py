@@ -9,10 +9,14 @@ single self-contained file.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = json.loads((ROOT / "preview_data.json").read_text(encoding="utf-8"))
+sys.path.insert(0, str(ROOT / "scripts"))
+from transcript_data import load  # noqa: E402
+
+DATA = load()
 
 # Each beat covers a range of transcript lines and carries the caption burned over the
 # footage plus the voiceover line read against it. Line numbers come from `--marks`.

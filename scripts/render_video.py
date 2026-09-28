@@ -130,7 +130,9 @@ def _hex(c: str) -> tuple[int, int, int]:
 
 
 def render(speed: float, out: Path, audio: Path | None, font_size: int, repo: str) -> None:
-    data = json.loads((ROOT / "preview_data.json").read_text(encoding="utf-8"))
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from transcript_data import load
+    data = load()
     lines = data["lines"]
     r = Renderer(font_size)
 

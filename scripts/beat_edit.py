@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import os
 import subprocess
 from pathlib import Path
@@ -33,7 +34,10 @@ WARN = (255, 200, 87)
 MONO, MONO_B = "C:/Windows/Fonts/consola.ttf", "C:/Windows/Fonts/consolab.ttf"
 UI_B, UI_BLK, UI = "C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/seguibl.ttf", "C:/Windows/Fonts/segoeui.ttf"
 
-LINES = json.loads((ROOT / "preview_data.json").read_text(encoding="utf-8"))["lines"]
+sys.path.insert(0, str(ROOT / "scripts"))
+from transcript_data import load  # noqa: E402  regenerates itself from the committed transcript
+
+LINES = load()["lines"]
 
 # The submission repo is published by someone else, so the end card must not be baked in.
 # Order of preference: --repo, then MEMOLINT_REPO_URL, then this repo's own git remote.
