@@ -10,13 +10,13 @@ I built Memolint to fix precisely that, and the interesting part turned out to b
 
 Memolint is a command-line reviewer. It takes a diff, a git range, or a pull request, and it produces findings. That part is unremarkable and any competent prompt does it.
 
-The part that matters sits either side of the model call. Before reviewing, it queries a memory bank for everything the team has said that might bear on this change. After the review, and after a human responds to it, it writes back what happened. The memory layer is [Hindsight, Vectorize's open source memory system for AI agents](https://github.com/vectorize-io/hindsight), which gives me three primitives: `retain` to store, `recall` to retrieve against a query, and `reflect` to reason over the whole bank.
+The part that matters sits either side of the model call. Before reviewing, it queries a memory bank for what the team has said that bears on this change. Afterwards, once a human responds, it writes back what happened. The memory layer is [Hindsight, Vectorize's open source memory system for AI agents](https://github.com/vectorize-io/hindsight), which gives me three primitives: `retain` to store, `recall` to retrieve against a query, and `reflect` to reason over the whole bank.
 
 The model stays stateless. The bank does not. One bank per repository, so the reviewer's opinions are scoped to the team that formed them.
 
 ## Four kinds of memory, and one of them does most of the work
 
-My first version retained everything as undifferentiated text and recalled it as a blob. It was better than nothing and worse than useless, because recall surfaced the agent's own previous reviews far more often than anything a human had said. The agent was mostly remembering itself talking.
+My first version retained everything as undifferentiated text. Recall then surfaced the agent's own previous reviews far more often than anything a human had said. It was mostly remembering itself talking.
 
 The fix was to classify what goes in, and tag it so recall results can be grouped when they're rendered into the prompt:
 
