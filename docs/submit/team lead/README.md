@@ -31,6 +31,16 @@ on the first line; paste your article URL into the link field.
 Use r/llmdevs, not the same one as your teammate. Two similar links to one
 subreddit in the same hour looks like spam. Backup: r/aimemory.
 
+## Images to add
+
+Dev.to has an image button in the editor toolbar; upload and it inserts the markdown.
+
+| Image | Put it after |
+|---|---|
+| `images/02-memory-on.png` | the pull-quote of the F1 HIGH finding, in "Teach it to match on shape" |
+| `images/03-deliberately-not-raised.png` | the "Deliberately not raised" quote in "The before and after" |
+| `images/04-rules-learned.png` | the last paragraph before "What I'd tell someone building this" |
+
 ## Rules
 
 The word "hackathon" must not appear in any of this, including hashtags. These files

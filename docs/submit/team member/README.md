@@ -31,6 +31,17 @@ on the first line; paste your article URL into the link field.
 Use r/aiagents, not the same one as your teammate. Two similar links to one
 subreddit in the same hour looks like spam. Backup: r/sideproject.
 
+## Images to add
+
+Dev.to has an image button in the editor toolbar; upload and it inserts the markdown.
+
+| Image | Put it after |
+|---|---|
+| `images/01-memory-off.png` | the "Without memory:" quote in "What the honest comparison looks like" |
+| `images/02-memory-on.png` | the "With memory:" quote just below it |
+
+Those two side by side are the whole argument of the piece.
+
 ## Rules
 
 The word "hackathon" must not appear in any of this, including hashtags. These files
