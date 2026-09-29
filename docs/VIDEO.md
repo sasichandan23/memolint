@@ -61,6 +61,26 @@ own git remote. Rendering takes a few minutes and nothing else changes, so do th
 after the repo is final. The card shrinks the text to fit, so a long URL is safe. Update the
 YouTube description at the bottom of this file to match.
 
+## Retiming to an exact length
+
+Every shot's duration is written in beats, not seconds, so changing the tempo changes the
+total length without cutting a single frame. To hit a target:
+
+    BPM = total_beats * 60 / target_seconds
+
+The edit is 322 beats, so 118 seconds (1:58) needs 163.7288 BPM:
+
+```bash
+python scripts/make_beat.py --bpm 163.7288 --bars 83 --out docs/track-158.wav
+python scripts/beat_edit.py --bpm 163.7288 --audio docs/track-158.wav   --repo https://github.com/WaifuPuller/MemoLint --out docs/memolint-edit-158.mp4
+```
+
+Generate a couple more bars of music than the arithmetic needs; the encoder trims the tail.
+Print the beat count any time with `python scripts/beat_edit.py --beats-only`.
+
+Faster is not free: at 150 BPM the terminal sections are comfortable to read, and much
+past 170 they start to feel rushed.
+
 ## The edit
 
 Music: one upbeat track, around 100-120 BPM, starting quiet. Cut on the beat. Suggested
