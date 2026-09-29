@@ -25,6 +25,8 @@ comments on your own post, in this order:
 
 ## 3. reddit.txt
 
+The submission form asks for this link, so it is not optional.
+
 Submit to r/llmdevs as a **Link** post, not a text post. The file has the title
 on the first line; paste your article URL into the link field.
 

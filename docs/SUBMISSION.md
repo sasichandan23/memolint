@@ -32,12 +32,15 @@ Do not paste the same thing everywhere. They are separate deliverables:
 |---|---|---|
 | Dev.to / Medium / Hashnode | The full article, ~1,400 words | one per member |
 | LinkedIn | The short post, under 800 characters. Article URL goes in the first comment, not the body | one per member |
-| Reddit | A link post pointing at the article. No body text | one per member, different subreddits |
+| Reddit | A link post pointing at the article. No body text | one per member, different subreddits. **The submission form asks for these** |
 | YouTube | The video | one per team |
 
 A LinkedIn *article* and a LinkedIn *post* are different features. The post is the short one.
 
 Minimum for eligibility: one article and one LinkedIn post each, plus one team video.
+The submission form also asks for the Reddit links, so treat those as required too.
+
+Only these four subreddits are allowed: r/llmdevs, r/sideproject, r/aiagents, r/aimemory.
 
 Publish the article first, since the LinkedIn comment and the Reddit post both need its URL.
 
