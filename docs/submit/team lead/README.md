@@ -11,6 +11,10 @@ Medium or Hashnode. It must end up public and linkable.
 Paste the whole file. Check the headings and code blocks survived, then publish and
 copy the URL.
 
+Upload `cover.png` from this folder as the cover image. It is already the right size
+(1000x420). If you would rather generate your own, the prompt is in
+`docs/cover-prompts.md`.
+
 ## 2. linkedin.txt
 
 Paste the whole file as a normal LinkedIn post, not a LinkedIn article. Then add two
