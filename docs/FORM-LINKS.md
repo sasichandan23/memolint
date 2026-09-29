@@ -8,7 +8,7 @@ every link here is canonical and will not expire.
 | Field | Link |
 |---|---|
 | GitHub repository | https://github.com/WaifuPuller/MemoLint |
-| Demo video | **pending** — not yet uploaded to YouTube |
+| Demo video | https://youtu.be/jWx0-Nl4BRk |
 
 ## Team lead (Aaditya Singh)
 
@@ -28,7 +28,7 @@ every link here is canonical and will not expire.
 
 ## Do not submit until
 
-- [ ] The video is uploaded to YouTube and set to Public, and its link is in the table above
+- [x] The video is uploaded to YouTube — **confirm it is set to Public, not Unlisted**
 - [ ] Every Reddit link opens in a private browser window, proving it was not filtered
 - [ ] Both members have completed the Profile Review Form
 - [ ] The repository has a description set on GitHub
